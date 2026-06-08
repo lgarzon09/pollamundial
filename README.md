@@ -78,3 +78,4 @@ supabase/
 └── schema.sql             # Esquema completo + RLS
 ```
 # pollamundial
+# pollamundial
