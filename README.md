@@ -79,3 +79,4 @@ supabase/
 ```
 # pollamundial
 # pollamundial
+# pollamundial
