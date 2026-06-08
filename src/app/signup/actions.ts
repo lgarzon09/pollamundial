@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,14 +16,11 @@ export async function signup(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: `${siteUrl}/auth/callback`,
       data: { display_name: displayName },
     },
   });
@@ -31,9 +29,23 @@ export async function signup(formData: FormData) {
     redirect(`/signup?error=${encodeURIComponent(error.message)}`);
   }
 
-  redirect(
-    `/signup?message=${encodeURIComponent(
-      "Te enviamos un email para confirmar tu cuenta. Revisa tu bandeja (y la carpeta de spam).",
-    )}`,
-  );
+  // Si la confirmación de email está desactivada en Supabase, signUp ya devuelve sesión
+  // y el usuario queda logueado automáticamente. Si por algún motivo no hay sesión,
+  // intentamos sign-in inmediato como fallback.
+  if (!data.session) {
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (signInError) {
+      redirect(
+        `/login?message=${encodeURIComponent(
+          "Cuenta creada. Inicia sesión con tu email y contraseña.",
+        )}`,
+      );
+    }
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/mi-resumen");
 }

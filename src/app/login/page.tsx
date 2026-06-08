@@ -4,9 +4,9 @@ import { login } from "./actions";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; redirectTo?: string }>;
+  searchParams: Promise<{ error?: string; message?: string; redirectTo?: string }>;
 }) {
-  const { error, redirectTo } = await searchParams;
+  const { error, message, redirectTo } = await searchParams;
 
   return (
     <main className="flex-1 flex items-center justify-center px-6 py-16">
@@ -21,6 +21,11 @@ export default async function LoginPage({
         {error && (
           <div className="rounded-md bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             {decodeURIComponent(error)}
+          </div>
+        )}
+        {message && (
+          <div className="rounded-md bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
+            {decodeURIComponent(message)}
           </div>
         )}
 
