@@ -14,6 +14,7 @@ const ITEMS = [
   { href: "/mi-resumen", label: "Inicio", star: true },
   { href: "/predicciones", label: "Predicciones" },
   { href: "/participantes", label: "Participantes" },
+  { href: "/reglas", label: "Reglas" },
 ];
 
 export function Nav({ displayName, isAdmin }: Props) {
