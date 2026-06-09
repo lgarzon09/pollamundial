@@ -176,7 +176,6 @@ export default async function ResumenPage() {
         <Stat
           label="Marcadores exactos acertados"
           value={totals.exactCount}
-          sub="(desempate)"
         />
         <Stat
           label="Predicciones hechas"
@@ -264,10 +263,6 @@ export default async function ResumenPage() {
             </tbody>
           </table>
         )}
-        <p className="px-4 sm:px-5 py-3 text-xs text-zinc-500 border-t border-zinc-100 dark:border-zinc-800">
-          Puntos sólo de predicciones por partido. Los puntos de la predicción
-          general se suman a medida que avanza el Mundial.
-        </p>
       </details>
 
       {/* Próximos partidos */}
