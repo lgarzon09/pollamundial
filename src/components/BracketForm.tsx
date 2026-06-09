@@ -340,12 +340,33 @@ export function BracketForm({
               </ol>
             </div>
 
-            <p>
-              <strong>Regla:</strong> cada 3° lugar puede usarse en{" "}
-              <em>un solo partido</em>. Si ya asignaste, por ejemplo, al 3° de
-              tu Grupo K en M79, aparecerá deshabilitado en los demás partidos
-              donde podría caer.
-            </p>
+            <div className="rounded-md bg-amber-100/70 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-100 px-3 py-2.5">
+              <p className="font-semibold mb-1">⚠️ Cómo se decide en la realidad</p>
+              <ul className="list-disc list-inside space-y-1 ml-1 text-xs">
+                <li>
+                  <strong>Regla principal de FIFA</strong>: un 3° de un grupo
+                  nunca puede enfrentar al 1° o 2° de su mismo grupo (ya se
+                  vieron en grupos). Por eso solo ves <strong>5 grupos
+                  candidatos</strong> en cada slot.
+                </li>
+                <li>
+                  FIFA tiene una <strong>tabla oficial de asignación</strong>{" "}
+                  con varios escenarios. El escenario real se sabe solo cuando
+                  terminan los grupos y se conocen cuáles 8 de los 12 terceros
+                  clasifican. Tu pick debe coincidir con esa asignación para
+                  ganar los puntos del matchup.
+                </li>
+                <li>
+                  <strong>No hay regla de confederaciones en KO</strong>: sí
+                  pueden enfrentarse 2 sudamericanos o 2 europeos.
+                </li>
+                <li>
+                  Cada 3° lugar puede usarse en <strong>un solo partido</strong>.
+                  Si ya asignaste al 3° de tu Grupo K en M79, queda
+                  deshabilitado en los demás slots.
+                </li>
+              </ul>
+            </div>
           </div>
         </details>
         <KORound
@@ -753,9 +774,35 @@ function KOMatchRow({
       {/* Paso 1: asignar 3° lugar si aplica */}
       {(homeIsThird || awayIsThird) && (
         <div>
-          <p className="text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">
-            1. Elige el 3° lugar que juega aquí
-          </p>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500 font-semibold">
+              1. Elige el 3° lugar que juega aquí
+            </p>
+            <details className="text-[11px]">
+              <summary className="cursor-pointer text-amber-700 dark:text-amber-400 font-medium select-none list-none">
+                ⚠️ ¿Cómo se decide esto en realidad?
+              </summary>
+              <div className="absolute z-10 mt-1 -mr-2 right-0 sm:right-auto sm:left-0 max-w-xs rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 p-3 text-amber-900 dark:text-amber-100 shadow-lg">
+                <p className="font-semibold mb-1">FIFA decide así:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>
+                    Un 3° no puede enfrentar al 1°/2° de su mismo grupo (por eso
+                    solo ves <strong>5 grupos candidatos</strong>).
+                  </li>
+                  <li>
+                    Cuando termine la fase de grupos, FIFA aplica una{" "}
+                    <strong>tabla oficial</strong> que define, según cuáles 8 de
+                    los 12 terceros clasifiquen, a qué slot va cada uno.
+                  </li>
+                  <li>
+                    Tu elección aquí debe coincidir con lo que decida esa tabla
+                    para ganar los puntos del matchup. Es estrategia: predecir
+                    qué grupos producen los mejores 3° lugares.
+                  </li>
+                </ul>
+              </div>
+            </details>
+          </div>
           {thirdPool.length === 0 ? (
             <p className="text-xs text-amber-600">
               Completa las posiciones de los grupos para ver candidatos.
@@ -768,9 +815,7 @@ function KOMatchRow({
                 disabled={readOnly}
                 className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 py-1.5 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
               >
-                <option value="">
-                  — Elegir 3° lugar —
-                </option>
+                <option value="">— Elegir 3° lugar —</option>
                 {thirdPool.map((id) => {
                   const t = teamsById.get(id);
                   if (!t) return null;
