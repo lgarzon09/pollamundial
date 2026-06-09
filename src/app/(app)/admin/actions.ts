@@ -96,6 +96,36 @@ export async function saveMatchResult(input: SaveResultInput) {
   return { ok: true };
 }
 
+type SaveKickoffInput = {
+  match_id: number;
+  // YYYY-MM-DDTHH:mm en la zona horaria del navegador del admin.
+  // Se convierte a UTC ISO antes de guardar.
+  local_kickoff: string;
+};
+
+export async function saveMatchKickoff(input: SaveKickoffInput) {
+  const { error: authErr, supabase } = await requireAdmin();
+  if (authErr || !supabase) return { error: authErr };
+
+  // El input viene como "YYYY-MM-DDTHH:mm" (datetime-local) interpretado en TZ local del cliente.
+  // El cliente lo convirtió a ISO string antes de pasarlo aquí.
+  const iso = input.local_kickoff;
+  if (!iso || isNaN(new Date(iso).getTime())) {
+    return { error: "Fecha/hora inválida." };
+  }
+
+  const { error } = await supabase
+    .from("matches")
+    .update({ kickoff_at: new Date(iso).toISOString() })
+    .eq("id", input.match_id);
+
+  if (error) return { error: error.message };
+  revalidatePath("/admin");
+  revalidatePath("/mi-resumen");
+  revalidatePath("/predicciones/partidos");
+  return { ok: true };
+}
+
 export async function clearMatchResult(matchId: number) {
   const { error: authErr, supabase } = await requireAdmin();
   if (authErr || !supabase) return { error: authErr };

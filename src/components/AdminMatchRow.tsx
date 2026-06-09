@@ -2,7 +2,17 @@
 
 import { useState, useTransition } from "react";
 import type { Match, MatchResult, Team } from "@/lib/db/types";
-import { saveMatchResult, clearMatchResult } from "@/app/(app)/admin/actions";
+import {
+  saveMatchResult,
+  clearMatchResult,
+  saveMatchKickoff,
+} from "@/app/(app)/admin/actions";
+
+function isoToLocalInput(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 type Props = {
   match: Match;
@@ -24,6 +34,30 @@ export function AdminMatchRow({ match, home, away, result }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [editingKickoff, setEditingKickoff] = useState(false);
+  const [localKickoff, setLocalKickoff] = useState(() =>
+    isoToLocalInput(match.kickoff_at),
+  );
+
+  function onSaveKickoff() {
+    setError(null);
+    setMessage(null);
+    if (!localKickoff) {
+      setError("Fecha/hora inválida.");
+      return;
+    }
+    startTransition(async () => {
+      const res = await saveMatchKickoff({
+        match_id: match.id,
+        local_kickoff: new Date(localKickoff).toISOString(),
+      });
+      if (res?.error) setError(res.error);
+      else {
+        setMessage("Hora actualizada.");
+        setEditingKickoff(false);
+      }
+    });
+  }
 
   const hs = parseInt(homeScore, 10);
   const as = parseInt(awayScore, 10);
@@ -70,6 +104,46 @@ export function AdminMatchRow({ match, home, away, result }: Props) {
 
   return (
     <div className="space-y-3">
+      {/* Editor de hora del partido */}
+      <div className="flex items-center justify-between gap-2 text-xs">
+        {editingKickoff ? (
+          <div className="flex items-center gap-2 flex-1">
+            <input
+              type="datetime-local"
+              value={localKickoff}
+              onChange={(e) => setLocalKickoff(e.target.value)}
+              className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 py-1 px-2 text-xs"
+            />
+            <button
+              type="button"
+              onClick={onSaveKickoff}
+              disabled={pending}
+              className="rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-2.5 py-1 disabled:opacity-50"
+            >
+              {pending ? "…" : "Guardar"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEditingKickoff(false);
+                setLocalKickoff(isoToLocalInput(match.kickoff_at));
+              }}
+              className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+            >
+              cancelar
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditingKickoff(true)}
+            className="text-zinc-500 hover:text-emerald-600 underline"
+          >
+            ✏️ Editar fecha/hora del partido
+          </button>
+        )}
+      </div>
+
       <div className="flex items-center gap-3 justify-center">
         <div className="flex flex-col items-center gap-1 w-32">
           <span className="text-2xl" aria-hidden>{home.flag_emoji ?? "🏳️"}</span>
