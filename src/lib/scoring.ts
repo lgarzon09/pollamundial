@@ -1,4 +1,24 @@
-import type { Match, MatchPrediction, MatchResult } from "./db/types";
+import type { Match, MatchPrediction, MatchResult, MatchStage } from "./db/types";
+
+/**
+ * Puntos máximos posibles en un partido según su etapa.
+ * (Marcador exacto 3 × mult) + ganador 2 + goles local 1 + goles visit. 1
+ *   + diferencia 1 + goleada 1 (= 6 fijos)
+ * + en KO: ganador KO +2
+ */
+export function maxPointsPerMatch(stage: MatchStage): number {
+  const multByStage: Record<MatchStage, number> = {
+    group: 1.0,
+    r32: 1.5,
+    r16: 2.0,
+    qf: 2.5,
+    sf: 3.0,
+    third_place: 3.0,
+    final: 4.0,
+  };
+  const isKO = stage !== "group";
+  return 3 * multByStage[stage] + 2 + 1 + 1 + 1 + 1 + (isKO ? 2 : 0);
+}
 
 export type ScoreLine = {
   label: string;

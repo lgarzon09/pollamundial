@@ -45,7 +45,11 @@ export default async function ResumenPage() {
       .eq("user_id", user.id)
       .maybeSingle(),
     supabase.from("profiles").select("id, display_name, is_admin"),
-    supabase.from("settings").select("tournament_start_at").eq("id", 1).maybeSingle(),
+    supabase
+      .from("settings")
+      .select("tournament_start_at, match_prediction_cutoff_minutes")
+      .eq("id", 1)
+      .maybeSingle(),
     supabase.from("match_predictions").select("*"),
     supabase
       .from("profiles")
@@ -124,6 +128,43 @@ export default async function ResumenPage() {
 
   const displayName = myProfile?.display_name ?? user.email ?? "participante";
 
+  // Calcular qué le falta al usuario
+  type Missing = { label: string; href: string };
+  const missing: Missing[] = [];
+  if (!bracketLocked) {
+    for (const g of GROUPS) {
+      const positions = br?.group_positions?.[g] ?? [];
+      const filled = positions.filter(Boolean).length;
+      const unique = new Set(positions.filter(Boolean)).size;
+      const complete = filled === 4 && unique === 4;
+      if (!complete) {
+        missing.push({
+          label: `Grupo ${g}: ${filled === 0 ? "sin llenar" : `${unique}/4 únicos`}`,
+          href: "/predicciones/general",
+        });
+      }
+    }
+    if (!br?.champion)
+      missing.push({ label: "Elegir campeón (30 pts)", href: "/predicciones/general" });
+    if (!br?.top_scorer)
+      missing.push({ label: "Predecir goleador (25 pts)", href: "/predicciones/general" });
+    if (!br?.golden_ball)
+      missing.push({ label: "Predecir Balón de Oro (15 pts)", href: "/predicciones/general" });
+    if (!br?.golden_glove)
+      missing.push({ label: "Predecir Guante de Oro (15 pts)", href: "/predicciones/general" });
+    if (!br?.young_player)
+      missing.push({ label: "Predecir mejor jugador joven (15 pts)", href: "/predicciones/general" });
+    if (!br?.revelation_team)
+      missing.push({ label: "Predecir equipo revelación (15 pts)", href: "/predicciones/general" });
+  }
+  // Partidos pendientes: cualquier partido NO bloqueado donde NO tienes predicción
+  const cutoffMs = (settings?.match_prediction_cutoff_minutes ?? 10) * 60_000;
+  const pendingMatches = matchList.filter((m) => {
+    const lockedAt = new Date(m.kickoff_at).getTime() - cutoffMs;
+    return lockedAt > Date.now() && !predictionsByMatch.has(m.id);
+  });
+  const upcomingPending = pendingMatches.slice(0, 3); // primeros 3 que se aproximan
+
   return (
     <main className="max-w-5xl mx-auto px-3 sm:px-6 py-6 sm:py-8 space-y-5 sm:space-y-7">
       <header>
@@ -134,6 +175,104 @@ export default async function ResumenPage() {
           Tu polla del Mundial 2026 — predicciones, ranking y partidos.
         </p>
       </header>
+
+      {/* Lo que te falta */}
+      {(missing.length > 0 || pendingMatches.length > 0) && (
+        <details
+          open
+          className="group rounded-xl border border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/60 overflow-hidden"
+        >
+          <summary className="px-4 sm:px-5 py-3 cursor-pointer flex items-center justify-between hover:bg-amber-100/50 dark:hover:bg-amber-900/30 list-none">
+            <h2 className="font-semibold text-amber-900 dark:text-amber-200">
+              📝 Lo que te falta
+            </h2>
+            <span className="text-xs text-amber-800 dark:text-amber-300 font-medium">
+              {missing.length + pendingMatches.length} pendiente
+              {missing.length + pendingMatches.length === 1 ? "" : "s"}
+            </span>
+          </summary>
+          <div className="px-4 sm:px-5 pb-4 space-y-3 text-sm text-amber-900 dark:text-amber-100">
+            {missing.length > 0 && (
+              <div>
+                <p className="text-xs uppercase tracking-wide font-semibold mb-1.5 opacity-80">
+                  En tu predicción general
+                </p>
+                <ul className="space-y-1">
+                  {missing.slice(0, 8).map((m, i) => (
+                    <li key={i} className="flex items-center justify-between gap-2">
+                      <span>• {m.label}</span>
+                      <Link
+                        href={m.href}
+                        className="text-xs underline shrink-0 text-amber-800 dark:text-amber-300"
+                      >
+                        ir
+                      </Link>
+                    </li>
+                  ))}
+                  {missing.length > 8 && (
+                    <li className="text-xs opacity-70">
+                      …y {missing.length - 8} más
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+            {pendingMatches.length > 0 && (
+              <div>
+                <p className="text-xs uppercase tracking-wide font-semibold mb-1.5 opacity-80">
+                  Predicciones por partido pendientes ({pendingMatches.length})
+                </p>
+                <ul className="space-y-1">
+                  {upcomingPending.map((m) => {
+                    const home = m.home_team_id
+                      ? teamsById.get(m.home_team_id)
+                      : null;
+                    const away = m.away_team_id
+                      ? teamsById.get(m.away_team_id)
+                      : null;
+                    return (
+                      <li
+                        key={m.id}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        <span className="truncate">
+                          •{" "}
+                          {home
+                            ? `${home.flag_emoji} ${home.name}`
+                            : m.home_placeholder ?? "?"}{" "}
+                          vs{" "}
+                          {away
+                            ? `${away.flag_emoji} ${away.name}`
+                            : m.away_placeholder ?? "?"}{" "}
+                          <span className="text-xs opacity-70">
+                            {formatMatchDate(m.kickoff_at)}
+                          </span>
+                        </span>
+                        <Link
+                          href="/predicciones/partidos"
+                          className="text-xs underline shrink-0 text-amber-800 dark:text-amber-300"
+                        >
+                          predecir
+                        </Link>
+                      </li>
+                    );
+                  })}
+                  {pendingMatches.length > upcomingPending.length && (
+                    <li>
+                      <Link
+                        href="/predicciones/partidos"
+                        className="text-xs underline text-amber-800 dark:text-amber-300"
+                      >
+                        Ver los {pendingMatches.length} pendientes →
+                      </Link>
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+        </details>
+      )}
 
       {/* CTA Predicción general (sólo si no está completa y aún no cierra) */}
       {!bracketLocked && !bracketComplete && (

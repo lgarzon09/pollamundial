@@ -9,7 +9,7 @@ import { dayKey, formatMatchDate, formatMatchTime } from "@/lib/format";
 import { TeamLabel } from "@/components/TeamLabel";
 import { StageBadge } from "@/components/StageBadge";
 import { MatchPredictionCard } from "@/components/MatchPredictionCard";
-import { scoreMatch } from "@/lib/scoring";
+import { maxPointsPerMatch, scoreMatch } from "@/lib/scoring";
 
 type Props = {
   matches: Match[];
@@ -186,14 +186,22 @@ function MatchEntry({
             Los equipos de este partido aún no están definidos. Vuelve cuando avance el torneo.
           </p>
         ) : canEdit ? (
-          <MatchPredictionCard
-            match={match}
-            home={home!}
-            away={away!}
-            teams={teamsList}
-            prediction={prediction}
-            cutoffMin={cutoffMin}
-          />
+          <>
+            <p className="text-xs text-zinc-500 mb-2">
+              Hasta <strong className="text-emerald-700 dark:text-emerald-400">
+                +{maxPointsPerMatch(match.stage).toString().replace(/\.0$/, "")} pts
+              </strong>{" "}
+              si aciertas todo en este partido.
+            </p>
+            <MatchPredictionCard
+              match={match}
+              home={home!}
+              away={away!}
+              teams={teamsList}
+              prediction={prediction}
+              cutoffMin={cutoffMin}
+            />
+          </>
         ) : (
           <ReadOnlyPrediction
             match={match}
