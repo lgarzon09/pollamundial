@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import type {
   Match,
   MatchPrediction,
@@ -5,53 +8,105 @@ import type {
   Settings,
   Team,
 } from "@/lib/db/types";
-import { dayKey, formatMatchDate, formatMatchTime } from "@/lib/format";
 import { TeamLabel } from "@/components/TeamLabel";
 import { StageBadge } from "@/components/StageBadge";
 import { MatchPredictionCard } from "@/components/MatchPredictionCard";
+import { LocalTime } from "@/components/LocalDateTime";
 import { maxPointsPerMatch, scoreMatch } from "@/lib/scoring";
 
 type Props = {
   matches: Match[];
-  teamsById: Map<string, Team>;
-  predictionsByMatch: Map<number, MatchPrediction>;
-  resultsByMatch: Map<number, MatchResult>;
+  teams: Team[];
+  predictions: MatchPrediction[];
+  results: MatchResult[];
   settings: Settings | null;
   readOnly: boolean;
   ownerLabel: string;
 };
 
+// Formato de día en TZ del navegador
+const DAY_HEADER_FMT = new Intl.DateTimeFormat("es-CO", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+});
+
+function localDayKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+}
+
 export function PredictionsByDay({
   matches,
-  teamsById,
-  predictionsByMatch,
-  resultsByMatch,
+  teams,
+  predictions,
+  results,
   settings,
   readOnly,
   ownerLabel,
 }: Props) {
+  // Esperamos a estar en el cliente para agrupar/mostrar con la TZ del navegador.
+  // Mientras tanto mostramos un placeholder. Evita mismatch SSR.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const teamsById = useMemo(
+    () => new Map(teams.map((t) => [t.id, t])),
+    [teams],
+  );
+  const predictionsByMatch = useMemo(
+    () => new Map(predictions.map((p) => [p.match_id, p])),
+    [predictions],
+  );
+  const resultsByMatch = useMemo(
+    () => new Map(results.map((r) => [r.match_id, r])),
+    [results],
+  );
+
+  const cutoffMin = settings?.match_prediction_cutoff_minutes ?? 10;
+
+  // Agrupar por día en TZ del browser
+  const days = useMemo(() => {
+    const map = new Map<string, Match[]>();
+    for (const m of matches) {
+      const k = localDayKey(m.kickoff_at);
+      if (!map.has(k)) map.set(k, []);
+      map.get(k)!.push(m);
+    }
+    return Array.from(map.entries());
+  }, [matches]);
+
+  if (!mounted) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="h-16 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 animate-pulse"
+          />
+        ))}
+      </div>
+    );
+  }
+
   if (matches.length === 0) {
     return (
       <p className="text-sm text-zinc-500">No hay partidos cargados todavía.</p>
     );
   }
 
-  // Agrupar por día (en zona horaria local del servidor; el cliente la re-renderiza si difiere)
-  const days = new Map<string, Match[]>();
-  for (const m of matches) {
-    const k = dayKey(m.kickoff_at);
-    if (!days.has(k)) days.set(k, []);
-    days.get(k)!.push(m);
-  }
-
-  const cutoffMin = settings?.match_prediction_cutoff_minutes ?? 10;
   const now = Date.now();
-  const teamsList = Array.from(teamsById.values());
-
-  // Encontrar el primer día con partidos sin cerrar para auto-expandir
+  // Primer día con partidos no cerrados (auto-open)
   let openDayKey: string | null = null;
   for (const [k, ms] of days) {
-    if (ms.some((m) => new Date(m.kickoff_at).getTime() > now - cutoffMin * 60_000)) {
+    if (
+      ms.some(
+        (m) =>
+          new Date(m.kickoff_at).getTime() > now - cutoffMin * 60_000,
+      )
+    ) {
       openDayKey = k;
       break;
     }
@@ -59,10 +114,12 @@ export function PredictionsByDay({
 
   return (
     <div className="space-y-3">
-      {Array.from(days.entries()).map(([k, ms]) => {
+      {days.map(([k, ms]) => {
         const first = ms[0];
         const open = k === openDayKey;
-        const visible = ms.filter((m) => isVisibleForUser(m, readOnly, predictionsByMatch, cutoffMin, now));
+        const visible = ms.filter((m) =>
+          isVisibleForUser(m, readOnly, predictionsByMatch, cutoffMin, now),
+        );
         if (visible.length === 0) return null;
         return (
           <details
@@ -73,7 +130,7 @@ export function PredictionsByDay({
             <summary className="px-5 py-3 cursor-pointer flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
               <div className="flex items-center gap-3">
                 <span className="font-semibold capitalize">
-                  {formatMatchDate(first.kickoff_at)}
+                  {DAY_HEADER_FMT.format(new Date(first.kickoff_at))}
                 </span>
                 <span className="text-xs text-zinc-500">
                   {visible.length} partido{visible.length === 1 ? "" : "s"}
@@ -89,7 +146,7 @@ export function PredictionsByDay({
                   <MatchEntry
                     match={m}
                     teamsById={teamsById}
-                    teamsList={teamsList}
+                    teamsList={teams}
                     prediction={predictionsByMatch.get(m.id) ?? null}
                     result={resultsByMatch.get(m.id) ?? null}
                     cutoffMin={cutoffMin}
@@ -113,8 +170,7 @@ function isVisibleForUser(
   cutoffMin: number,
   now: number,
 ) {
-  if (!readOnly) return true; // mis-predicciones: ver todos
-  // En vista de otro jugador: sólo partidos cerrados o donde el otro tenga predicción guardada visible
+  if (!readOnly) return true;
   const locked = new Date(match.kickoff_at).getTime() - cutoffMin * 60_000 <= now;
   return locked && predictionsByMatch.has(match.id);
 }
@@ -150,7 +206,7 @@ function MatchEntry({
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <StageBadge stage={match.stage} groupCode={match.group_code} />
           <span className="text-xs text-zinc-500 whitespace-nowrap">
-            {formatMatchTime(match.kickoff_at)}
+            <LocalTime iso={match.kickoff_at} />
           </span>
           <div className="flex items-center gap-2 truncate">
             <TeamLabel team={home} placeholder={match.home_placeholder} size="sm" />
@@ -188,7 +244,8 @@ function MatchEntry({
         ) : canEdit ? (
           <>
             <p className="text-xs text-zinc-500 mb-2">
-              Hasta <strong className="text-emerald-700 dark:text-emerald-400">
+              Hasta{" "}
+              <strong className="text-emerald-700 dark:text-emerald-400">
                 +{maxPointsPerMatch(match.stage).toString().replace(/\.0$/, "")} pts
               </strong>{" "}
               si aciertas todo en este partido.

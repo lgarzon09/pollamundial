@@ -10,7 +10,7 @@ import type {
 import { STAGE_SHORT } from "@/lib/db/types";
 import { TeamLabel } from "@/components/TeamLabel";
 import { StageBadge } from "@/components/StageBadge";
-import { formatMatchDate, formatMatchTime } from "@/lib/format";
+import { LocalDate, LocalTime } from "@/components/LocalDateTime";
 import { scoreMatch, totalMatchPoints } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
@@ -245,7 +245,7 @@ export default async function ResumenPage() {
                             ? `${away.flag_emoji} ${away.name}`
                             : m.away_placeholder ?? "?"}{" "}
                           <span className="text-xs opacity-70">
-                            {formatMatchDate(m.kickoff_at)}
+                            {<LocalDate iso={m.kickoff_at} />}
                           </span>
                         </span>
                         <Link
@@ -488,8 +488,8 @@ export default async function ResumenPage() {
                           {away?.name ?? m.away_placeholder ?? "?"}
                         </div>
                         <div className="text-xs text-zinc-500">
-                          {formatMatchDate(m.kickoff_at)} ·{" "}
-                          {formatMatchTime(m.kickoff_at)}
+                          {<LocalDate iso={m.kickoff_at} />} ·{" "}
+                          {<LocalTime iso={m.kickoff_at} />}
                         </div>
                       </div>
                       <div className="text-right">
@@ -823,8 +823,8 @@ function MatchRow({
         <div className="flex items-center gap-2">
           <StageBadge stage={match.stage} groupCode={match.group_code} />
           <span className="text-xs text-zinc-500">
-            {formatMatchDate(match.kickoff_at)} ·{" "}
-            {formatMatchTime(match.kickoff_at)}
+            {<LocalDate iso={match.kickoff_at} />} ·{" "}
+            {<LocalTime iso={match.kickoff_at} />}
           </span>
         </div>
         <div className="flex items-center gap-2 truncate">

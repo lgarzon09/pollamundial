@@ -31,14 +31,6 @@ export default async function PrediccionesPartidosPage() {
     supabase.from("settings").select("*").eq("id", 1).maybeSingle(),
   ]);
 
-  const teamsById = new Map<string, Team>((teams ?? []).map((t) => [t.id, t]));
-  const resultsByMatch = new Map<number, MatchResult>(
-    (results ?? []).map((r) => [r.match_id, r as MatchResult]),
-  );
-  const predictionsByMatch = new Map<number, MatchPrediction>(
-    (predictions ?? []).map((p) => [p.match_id, p as MatchPrediction]),
-  );
-
   return (
     <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
       <header className="space-y-3">
@@ -74,9 +66,9 @@ export default async function PrediccionesPartidosPage() {
 
       <PredictionsByDay
         matches={(matches ?? []) as Match[]}
-        teamsById={teamsById}
-        predictionsByMatch={predictionsByMatch}
-        resultsByMatch={resultsByMatch}
+        teams={(teams ?? []) as Team[]}
+        predictions={(predictions ?? []) as MatchPrediction[]}
+        results={(results ?? []) as MatchResult[]}
         settings={(settings as Settings) ?? null}
         readOnly={false}
         ownerLabel="tu predicción"

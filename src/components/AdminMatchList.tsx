@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import type { Match, MatchResult, Team } from "@/lib/db/types";
-import { dayKey, formatMatchDate, formatMatchTime } from "@/lib/format";
+import { dayKey, formatMatchDate } from "@/lib/format";
+import { LocalTime } from "@/components/LocalDateTime";
 import { StageBadge } from "@/components/StageBadge";
 import { AdminMatchRow } from "@/components/AdminMatchRow";
 
@@ -93,7 +94,7 @@ export function AdminMatchList({ matches, results, teams }: Props) {
                           <div className="flex items-center gap-3 min-w-0">
                             <StageBadge stage={m.stage} groupCode={m.group_code} />
                             <span className="text-xs text-zinc-500 whitespace-nowrap">
-                              {formatMatchTime(m.kickoff_at)}
+                              {<LocalTime iso={m.kickoff_at} />}
                             </span>
                             <span className="truncate text-sm">
                               <span className="mr-1">{home?.flag_emoji ?? "·"}</span>

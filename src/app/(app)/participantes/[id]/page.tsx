@@ -53,12 +53,6 @@ export default async function ParticipanteDetalle({
   if (!profile) notFound();
 
   const teamsById = new Map<string, Team>((teams ?? []).map((t) => [t.id, t]));
-  const resultsByMatch = new Map<number, MatchResult>(
-    (results ?? []).map((r) => [r.match_id, r as MatchResult]),
-  );
-  const predictionsByMatch = new Map<number, MatchPrediction>(
-    (predictions ?? []).map((p) => [p.match_id, p as MatchPrediction]),
-  );
 
   const tournamentStart = (settings as Settings | null)?.tournament_start_at
     ? new Date((settings as Settings).tournament_start_at)
@@ -169,9 +163,9 @@ export default async function ParticipanteDetalle({
         </p>
         <PredictionsByDay
           matches={(matches ?? []) as Match[]}
-          teamsById={teamsById}
-          predictionsByMatch={predictionsByMatch}
-          resultsByMatch={resultsByMatch}
+          teams={(teams ?? []) as Team[]}
+          predictions={(predictions ?? []) as MatchPrediction[]}
+          results={(results ?? []) as MatchResult[]}
           settings={(settings as Settings) ?? null}
           readOnly
           ownerLabel={profile.display_name}
