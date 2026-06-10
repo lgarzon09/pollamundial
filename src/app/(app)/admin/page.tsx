@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Match, MatchResult, Team, TournamentResults } from "@/lib/db/types";
 import { AdminMatchList } from "@/components/AdminMatchList";
 import { AdminTournamentResults } from "@/components/AdminTournamentResults";
+import { AdminProgressList } from "@/components/AdminProgressList";
 
 export const dynamic = "force-dynamic";
 
@@ -37,17 +38,23 @@ export default async function AdminPage() {
     );
   }
 
-  const [{ data: matches }, { data: results }, { data: teams }, { data: tournament }] =
-    await Promise.all([
-      supabase.from("matches").select("*").order("kickoff_at", { ascending: true }),
-      supabase.from("match_results").select("*"),
-      supabase.from("teams").select("*"),
-      supabase
-        .from("tournament_results")
-        .select("*")
-        .eq("id", 1)
-        .maybeSingle(),
-    ]);
+  const [
+    { data: matches },
+    { data: results },
+    { data: teams },
+    { data: tournament },
+    { data: progressRows },
+  ] = await Promise.all([
+    supabase.from("matches").select("*").order("kickoff_at", { ascending: true }),
+    supabase.from("match_results").select("*"),
+    supabase.from("teams").select("*"),
+    supabase
+      .from("tournament_results")
+      .select("*")
+      .eq("id", 1)
+      .maybeSingle(),
+    supabase.rpc("participant_progress"),
+  ]);
 
   return (
     <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
@@ -59,6 +66,8 @@ export default async function AdminPage() {
           siguiente partido.
         </p>
       </header>
+
+      <AdminProgressList rows={(progressRows ?? []) as never} />
 
       <AdminMatchList
         matches={(matches ?? []) as Match[]}

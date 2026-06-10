@@ -7,9 +7,16 @@ type ProgressRow = {
   email: string;
   is_admin: boolean;
   groups_completed: number;
+  groups_incomplete_codes: string[];
   champion_set: boolean;
+  top_scorer_set: boolean;
+  golden_ball_set: boolean;
+  golden_glove_set: boolean;
+  young_player_set: boolean;
+  revelation_team_set: boolean;
   bracket_started: boolean;
   predictions_count: number;
+  available_matches_count: number;
 };
 
 export const dynamic = "force-dynamic";
@@ -20,22 +27,20 @@ export default async function ParticipantesPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: rows }, { data: matches }, { data: myProfile }] =
-    await Promise.all([
-      supabase.rpc("participant_progress"),
-      supabase.from("matches").select("id", { count: "exact", head: true }),
-      user
-        ? supabase
-            .from("profiles")
-            .select("is_admin")
-            .eq("id", user.id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-    ]);
+  const [{ data: rows }, { data: myProfile }] = await Promise.all([
+    supabase.rpc("participant_progress"),
+    user
+      ? supabase
+          .from("profiles")
+          .select("is_admin")
+          .eq("id", user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
 
-  const totalMatches = (matches as unknown as { count: number } | null)?.count ?? 104;
   const isAdmin = !!myProfile?.is_admin;
   const participants = (rows ?? []) as ProgressRow[];
+  const totalAvailable = participants[0]?.available_matches_count ?? 72;
 
   return (
     <main className="max-w-5xl mx-auto px-3 sm:px-6 py-6 sm:py-8 space-y-5">
@@ -54,10 +59,11 @@ export default async function ParticipantesPage() {
       ) : (
         <ul className="space-y-2">
           {participants.map((p) => {
+            const totalMatchesForUser = p.available_matches_count || totalAvailable;
             const bracketComplete = p.groups_completed === 12 && p.champion_set;
             const matchPct =
-              totalMatches > 0
-                ? Math.round((p.predictions_count / totalMatches) * 100)
+              totalMatchesForUser > 0
+                ? Math.round((p.predictions_count / totalMatchesForUser) * 100)
                 : 0;
             return (
               <li
@@ -119,9 +125,9 @@ export default async function ParticipantesPage() {
                     />
                     <ProgressLine
                       label="Predicciones por partido"
-                      detail={`${p.predictions_count}/${totalMatches} (${matchPct}%)`}
+                      detail={`${p.predictions_count}/${totalMatchesForUser} (${matchPct}%)`}
                       pct={matchPct}
-                      complete={p.predictions_count === totalMatches}
+                      complete={p.predictions_count === totalMatchesForUser}
                     />
                   </div>
                 </Link>

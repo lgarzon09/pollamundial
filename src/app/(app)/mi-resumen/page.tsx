@@ -157,9 +157,12 @@ export default async function ResumenPage() {
     if (!br?.revelation_team)
       missing.push({ label: "Predecir equipo revelación (15 pts)", href: "/predicciones/general" });
   }
-  // Partidos pendientes: cualquier partido NO bloqueado donde NO tienes predicción
+  // Partidos pendientes: partidos donde YA hay equipos definidos, no están bloqueados,
+  // y no tienes predicción. Los KO sin equipos todavía no cuentan como "pendientes"
+  // porque no se pueden predecir.
   const cutoffMs = (settings?.match_prediction_cutoff_minutes ?? 10) * 60_000;
   const pendingMatches = matchList.filter((m) => {
+    if (!m.home_team_id || !m.away_team_id) return false;
     const lockedAt = new Date(m.kickoff_at).getTime() - cutoffMs;
     return lockedAt > Date.now() && !predictionsByMatch.has(m.id);
   });
