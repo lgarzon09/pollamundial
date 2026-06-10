@@ -298,6 +298,10 @@ drop policy if exists "groups read" on public.groups;
 create policy "groups read" on public.groups for select to anon, authenticated using (true);
 drop policy if exists "matches read" on public.matches;
 create policy "matches read" on public.matches for select to anon, authenticated using (true);
+-- Admin puede editar metadata de partidos (kickoff_at, equipos asignados a slots KO, etc.)
+drop policy if exists "matches admin update" on public.matches;
+create policy "matches admin update" on public.matches for update to authenticated
+  using (public.is_admin()) with check (public.is_admin());
 
 -- match_results: lectura para todos
 drop policy if exists "match_results read" on public.match_results;
