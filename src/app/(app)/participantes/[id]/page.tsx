@@ -43,7 +43,6 @@ export default async function ParticipanteDetalle({
     supabase.from("match_results").select("*"),
     supabase.from("teams").select("*"),
     supabase.from("settings").select("*").eq("id", 1).maybeSingle(),
-    // RLS: solo retornará data si tournament ya inició o si es del propio usuario
     supabase
       .from("bracket_predictions")
       .select("*")
@@ -62,9 +61,10 @@ export default async function ParticipanteDetalle({
     ? tournamentStart.getTime() <= Date.now()
     : false;
   const br = (bracket as BracketPrediction | null) ?? null;
+  const matchList = (matches ?? []) as Match[];
 
   return (
-    <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+    <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-5">
       <header className="flex items-center justify-between gap-4">
         <div>
           <Link
@@ -77,22 +77,59 @@ export default async function ParticipanteDetalle({
         </div>
       </header>
 
-      {/* Predicción general (bracket) — solo visible para los demás después del inicio del Mundial */}
-      <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
-        <div className="px-5 py-3 border-b border-zinc-200 dark:border-zinc-800">
-          <h2 className="font-semibold">Predicción general</h2>
+      {/* Predicciones por partido (primero, abierto por defecto) */}
+      <details
+        open
+        className="group rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden"
+      >
+        <summary className="px-4 sm:px-5 py-3 cursor-pointer flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800/40 list-none">
+          <h2 className="font-semibold">Predicciones por partido</h2>
+          <span
+            className="text-zinc-400 group-open:rotate-180 transition-transform"
+            aria-hidden
+          >
+            ▾
+          </span>
+        </summary>
+        <div className="px-4 sm:px-5 py-4 space-y-3">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            Sólo verás las de partidos que ya están cerrados (10 min antes del
+            kickoff).
+          </p>
+          <PredictionsByDay
+            matches={matchList}
+            teams={(teams ?? []) as Team[]}
+            predictions={(predictions ?? []) as MatchPrediction[]}
+            results={(results ?? []) as MatchResult[]}
+            settings={(settings as Settings) ?? null}
+            readOnly
+            ownerLabel={profile.display_name}
+          />
         </div>
+      </details>
+
+      {/* Predicción general (después, cerrado por defecto) */}
+      <details className="group rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
+        <summary className="px-4 sm:px-5 py-3 cursor-pointer flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800/40 list-none">
+          <h2 className="font-semibold">Predicción general</h2>
+          <span
+            className="text-zinc-400 group-open:rotate-180 transition-transform"
+            aria-hidden
+          >
+            ▾
+          </span>
+        </summary>
         {!bracketVisible ? (
-          <p className="px-5 py-6 text-sm text-zinc-500">
+          <p className="px-5 py-6 text-sm text-zinc-500 border-t border-zinc-100 dark:border-zinc-800">
             La predicción general de los demás se hace pública cuando inicie el
             Mundial.
           </p>
         ) : !br ? (
-          <p className="px-5 py-6 text-sm text-zinc-500">
+          <p className="px-5 py-6 text-sm text-zinc-500 border-t border-zinc-100 dark:border-zinc-800">
             {profile.display_name} no llenó su predicción general.
           </p>
         ) : (
-          <div className="p-5 space-y-5 text-sm">
+          <div className="p-5 space-y-5 text-sm border-t border-zinc-100 dark:border-zinc-800">
             <div>
               <p className="text-xs uppercase tracking-wider text-zinc-500 font-semibold mb-2">
                 Posiciones de grupos
@@ -131,25 +168,25 @@ export default async function ParticipanteDetalle({
 
             <KORoundBlock
               title="Ronda de 32 (16vos)"
-              matches={((matches ?? []) as Match[]).filter((m) => m.stage === "r32")}
+              matches={matchList.filter((m) => m.stage === "r32")}
               winners={br.r32_winners ?? {}}
               teamsById={teamsById}
             />
             <KORoundBlock
               title="Octavos de final"
-              matches={((matches ?? []) as Match[]).filter((m) => m.stage === "r16")}
+              matches={matchList.filter((m) => m.stage === "r16")}
               winners={br.r16_winners ?? {}}
               teamsById={teamsById}
             />
             <KORoundBlock
               title="Cuartos de final"
-              matches={((matches ?? []) as Match[]).filter((m) => m.stage === "qf")}
+              matches={matchList.filter((m) => m.stage === "qf")}
               winners={br.qf_winners ?? {}}
               teamsById={teamsById}
             />
             <KORoundBlock
               title="Semifinales"
-              matches={((matches ?? []) as Match[]).filter((m) => m.stage === "sf")}
+              matches={matchList.filter((m) => m.stage === "sf")}
               winners={br.sf_winners ?? {}}
               teamsById={teamsById}
             />
@@ -178,25 +215,7 @@ export default async function ParticipanteDetalle({
             </div>
           </div>
         )}
-      </section>
-
-      {/* Predicciones por partido — visibles partido por partido tras cierre */}
-      <section className="space-y-3">
-        <h2 className="text-xl font-bold">Predicciones por partido</h2>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Sólo verás las de partidos que ya están cerrados (10 min antes del
-          kickoff).
-        </p>
-        <PredictionsByDay
-          matches={(matches ?? []) as Match[]}
-          teams={(teams ?? []) as Team[]}
-          predictions={(predictions ?? []) as MatchPrediction[]}
-          results={(results ?? []) as MatchResult[]}
-          settings={(settings as Settings) ?? null}
-          readOnly
-          ownerLabel={profile.display_name}
-        />
-      </section>
+      </details>
     </main>
   );
 }
@@ -209,4 +228,3 @@ function BracketLine({ label, value }: { label: string; value: string | null }) 
     </div>
   );
 }
-
