@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logout } from "@/app/login/actions";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type Props = {
   displayName: string;
@@ -53,26 +54,31 @@ export function Nav({ displayName, isAdmin }: Props) {
           ))}
         </nav>
 
-        {/* Desktop user + logout */}
-        <form action={logout} className="hidden sm:flex items-center gap-3">
+        {/* Desktop: tema + user + logout */}
+        <div className="hidden sm:flex items-center gap-2">
+          <ThemeToggle />
           <span className="text-sm text-zinc-600 dark:text-zinc-400 max-w-[140px] truncate">
             {displayName}
           </span>
-          <button
-            type="submit"
-            className="text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
-          >
-            Salir
-          </button>
-        </form>
+          <form action={logout}>
+            <button
+              type="submit"
+              className="text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+            >
+              Salir
+            </button>
+          </form>
+        </div>
 
-        {/* Mobile hamburger */}
+        {/* Mobile: tema + hamburger */}
+        <div className="sm:hidden flex items-center gap-1 -mr-2">
+          <ThemeToggle />
         <button
           type="button"
           aria-label={open ? "Cerrar menú" : "Abrir menú"}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className="sm:hidden inline-flex items-center justify-center rounded-md p-2 -mr-2 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          className="inline-flex items-center justify-center rounded-md p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800"
         >
           <span aria-hidden className="block w-6 h-6 relative">
             <span
@@ -92,6 +98,7 @@ export function Nav({ displayName, isAdmin }: Props) {
             />
           </span>
         </button>
+        </div>
       </div>
 
       {/* Mobile dropdown */}
