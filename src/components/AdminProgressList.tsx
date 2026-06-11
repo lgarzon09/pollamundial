@@ -5,6 +5,10 @@ type ProgressRow = {
   is_admin: boolean;
   groups_completed: number;
   groups_incomplete_codes: string[];
+  r32_picks: number;
+  r16_picks: number;
+  qf_picks: number;
+  sf_picks: number;
   champion_set: boolean;
   top_scorer_set: boolean;
   golden_ball_set: boolean;
@@ -38,10 +42,13 @@ export function AdminProgressList({ rows }: { rows: ProgressRow[] }) {
           {rows.map((p) => {
             const missing: string[] = [];
             if (p.groups_incomplete_codes.length > 0) {
-              missing.push(
-                `Grupos: ${p.groups_incomplete_codes.join(", ")}`,
-              );
+              missing.push(`Grupos: ${p.groups_incomplete_codes.join(", ")}`);
             }
+            if (p.r32_picks < 16)
+              missing.push(`R32 (${p.r32_picks}/16)`);
+            if (p.r16_picks < 8) missing.push(`8vos (${p.r16_picks}/8)`);
+            if (p.qf_picks < 4) missing.push(`4tos (${p.qf_picks}/4)`);
+            if (p.sf_picks < 2) missing.push(`Semis (${p.sf_picks}/2)`);
             if (!p.champion_set) missing.push("Campeón");
             if (!p.top_scorer_set) missing.push("Goleador");
             if (!p.golden_ball_set) missing.push("Balón de Oro");
@@ -51,10 +58,12 @@ export function AdminProgressList({ rows }: { rows: ProgressRow[] }) {
 
             const total = p.available_matches_count || 72;
             const matchesPending = total - p.predictions_count;
-            const matchPct = total > 0 ? Math.round((p.predictions_count / total) * 100) : 0;
+            const matchPct =
+              total > 0 ? Math.round((p.predictions_count / total) * 100) : 0;
 
             const bracketComplete = missing.length === 0;
-            const everythingDone = bracketComplete && p.predictions_count === total;
+            const everythingDone =
+              bracketComplete && p.predictions_count === total;
 
             return (
               <li

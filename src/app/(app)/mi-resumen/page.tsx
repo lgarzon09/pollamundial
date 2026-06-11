@@ -117,14 +117,29 @@ export default async function ResumenPage() {
   const myRank = rankedProfiles.findIndex((p) => p.id === user.id) + 1;
   const br = (bracket as BracketPrediction | null) ?? null;
 
-  // ¿Predicción general "completa"? (12 grupos + campeón)
+  // ¿Predicción general "completa"? (12 grupos + R32 + R16 + QF + SF + campeón + 5 premios)
+  const countJsonbKeys = (obj: Record<string, string> | undefined) =>
+    obj ? Object.values(obj).filter(Boolean).length : 0;
+  const r32Picks = countJsonbKeys(br?.r32_winners);
+  const r16Picks = countJsonbKeys(br?.r16_winners);
+  const qfPicks = countJsonbKeys(br?.qf_winners);
+  const sfPicks = countJsonbKeys(br?.sf_winners);
   const bracketComplete =
     !!br &&
     GROUPS.every((g) => {
       const pos = br.group_positions?.[g] ?? [];
       return pos.filter(Boolean).length === 4 && new Set(pos).size === 4;
     }) &&
-    !!br.champion;
+    r32Picks === 16 &&
+    r16Picks === 8 &&
+    qfPicks === 4 &&
+    sfPicks === 2 &&
+    !!br.champion &&
+    !!br.top_scorer &&
+    !!br.golden_ball &&
+    !!br.golden_glove &&
+    !!br.young_player &&
+    !!br.revelation_team;
 
   const displayName = myProfile?.display_name ?? user.email ?? "participante";
 
@@ -144,6 +159,26 @@ export default async function ResumenPage() {
         });
       }
     }
+    if (r32Picks < 16)
+      missing.push({
+        label: `Ganadores de R32 (${r32Picks}/16 picks)`,
+        href: "/predicciones/general",
+      });
+    if (r16Picks < 8)
+      missing.push({
+        label: `Ganadores de 8vos (${r16Picks}/8 picks)`,
+        href: "/predicciones/general",
+      });
+    if (qfPicks < 4)
+      missing.push({
+        label: `Ganadores de 4tos (${qfPicks}/4 picks)`,
+        href: "/predicciones/general",
+      });
+    if (sfPicks < 2)
+      missing.push({
+        label: `Ganadores de semis (${sfPicks}/2 picks)`,
+        href: "/predicciones/general",
+      });
     if (!br?.champion)
       missing.push({ label: "Elegir campeón (30 pts)", href: "/predicciones/general" });
     if (!br?.top_scorer)
