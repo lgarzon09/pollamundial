@@ -10,6 +10,7 @@ import type {
   Team,
 } from "@/lib/db/types";
 import { PredictionsByDay } from "@/components/PredictionsByDay";
+import { KORoundBlock } from "@/components/KORoundBlock";
 
 export const dynamic = "force-dynamic";
 
@@ -128,6 +129,31 @@ export default async function ParticipanteDetalle({
               </div>
             </div>
 
+            <KORoundBlock
+              title="Ronda de 32 (16vos)"
+              matches={((matches ?? []) as Match[]).filter((m) => m.stage === "r32")}
+              winners={br.r32_winners ?? {}}
+              teamsById={teamsById}
+            />
+            <KORoundBlock
+              title="Octavos de final"
+              matches={((matches ?? []) as Match[]).filter((m) => m.stage === "r16")}
+              winners={br.r16_winners ?? {}}
+              teamsById={teamsById}
+            />
+            <KORoundBlock
+              title="Cuartos de final"
+              matches={((matches ?? []) as Match[]).filter((m) => m.stage === "qf")}
+              winners={br.qf_winners ?? {}}
+              teamsById={teamsById}
+            />
+            <KORoundBlock
+              title="Semifinales"
+              matches={((matches ?? []) as Match[]).filter((m) => m.stage === "sf")}
+              winners={br.sf_winners ?? {}}
+              teamsById={teamsById}
+            />
+
             <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
               <BracketLine
                 label="Campeón"
@@ -183,3 +209,4 @@ function BracketLine({ label, value }: { label: string; value: string | null }) 
     </div>
   );
 }
+

@@ -11,6 +11,7 @@ import { STAGE_SHORT } from "@/lib/db/types";
 import { TeamLabel } from "@/components/TeamLabel";
 import { StageBadge } from "@/components/StageBadge";
 import { LocalDate, LocalTime } from "@/components/LocalDateTime";
+import { KORoundBlock } from "@/components/KORoundBlock";
 import { scoreMatch, totalMatchPoints } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
@@ -712,6 +713,31 @@ export default async function ResumenPage() {
                 })}
               </div>
             </div>
+
+            <KORoundBlock
+              title="Ronda de 32 (16vos)"
+              matches={matchList.filter((m) => m.stage === "r32")}
+              winners={br.r32_winners ?? {}}
+              teamsById={teamsById}
+            />
+            <KORoundBlock
+              title="Octavos de final"
+              matches={matchList.filter((m) => m.stage === "r16")}
+              winners={br.r16_winners ?? {}}
+              teamsById={teamsById}
+            />
+            <KORoundBlock
+              title="Cuartos de final"
+              matches={matchList.filter((m) => m.stage === "qf")}
+              winners={br.qf_winners ?? {}}
+              teamsById={teamsById}
+            />
+            <KORoundBlock
+              title="Semifinales"
+              matches={matchList.filter((m) => m.stage === "sf")}
+              winners={br.sf_winners ?? {}}
+              teamsById={teamsById}
+            />
 
             <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <BracketRow
