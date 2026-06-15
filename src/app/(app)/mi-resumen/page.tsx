@@ -455,9 +455,15 @@ export default async function ResumenPage() {
                 <th className="px-5 py-2 text-right">Puntos</th>
                 <th
                   className="px-3 py-2 text-right"
-                  title="Cambio de posición y puntos desde la última jornada"
+                  title="Cambio de posición desde la última jornada"
                 >
-                  Cambio
+                  Puestos
+                </th>
+                <th
+                  className="px-3 py-2 text-right"
+                  title="Puntos ganados desde la última jornada"
+                >
+                  Δ pts
                 </th>
                 <th
                   className="px-5 py-2 text-right hidden sm:table-cell"
@@ -498,12 +504,16 @@ export default async function ResumenPage() {
                     {p.total.toString().replace(/\.0$/, "")}
                   </td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
-                    <MovementBadge
+                    <PositionDelta
                       deltaPos={
                         prevPosById.has(p.id)
                           ? prevPosById.get(p.id)! - (i + 1)
                           : null
                       }
+                    />
+                  </td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <PointsDelta
                       deltaPts={
                         prevPtsById.has(p.id)
                           ? p.total - prevPtsById.get(p.id)!
@@ -874,25 +884,14 @@ function Stat({
   );
 }
 
-function MovementBadge({
-  deltaPos,
-  deltaPts,
-}: {
-  deltaPos: number | null;
-  deltaPts: number | null;
-}) {
+function PositionDelta({ deltaPos }: { deltaPos: number | null }) {
   if (deltaPos === null) {
     return <span className="text-xs text-zinc-300 dark:text-zinc-700">—</span>;
   }
-  const ptsStr =
-    deltaPts && deltaPts > 0
-      ? `+${deltaPts.toString().replace(/\.0$/, "")}`
-      : null;
   if (deltaPos > 0) {
     return (
       <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
         ▲{deltaPos}
-        {ptsStr && <span className="ml-1 font-mono font-normal">{ptsStr}</span>}
       </span>
     );
   }
@@ -900,18 +899,19 @@ function MovementBadge({
     return (
       <span className="text-xs font-semibold text-red-600 dark:text-red-400">
         ▼{Math.abs(deltaPos)}
-        {ptsStr && <span className="ml-1 font-mono font-normal">{ptsStr}</span>}
       </span>
     );
   }
+  return <span className="text-xs text-zinc-400">=</span>;
+}
+
+function PointsDelta({ deltaPts }: { deltaPts: number | null }) {
+  if (deltaPts === null || deltaPts <= 0) {
+    return <span className="text-xs text-zinc-300 dark:text-zinc-700">—</span>;
+  }
   return (
-    <span className="text-xs text-zinc-500">
-      = se mantuvo
-      {ptsStr && (
-        <span className="ml-1 font-mono text-emerald-600 dark:text-emerald-400">
-          {ptsStr}
-        </span>
-      )}
+    <span className="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+      +{deltaPts.toString().replace(/\.0$/, "")}
     </span>
   );
 }
