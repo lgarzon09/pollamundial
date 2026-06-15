@@ -23,12 +23,18 @@ export default async function PrediccionesPartidosPage() {
     { data: results },
     { data: teams },
     { data: settings },
+    { data: allPredictions },
+    { data: profiles },
   ] = await Promise.all([
     supabase.from("matches").select("*").order("kickoff_at", { ascending: true }),
     supabase.from("match_predictions").select("*").eq("user_id", user.id),
     supabase.from("match_results").select("*"),
     supabase.from("teams").select("*"),
     supabase.from("settings").select("*").eq("id", 1).maybeSingle(),
+    // Todas las predicciones: la RLS solo expone las ajenas tras el cierre del
+    // partido, así que aquí llegan únicamente las visibles.
+    supabase.from("match_predictions").select("*"),
+    supabase.from("profiles").select("id, display_name"),
   ]);
 
   return (
@@ -72,6 +78,10 @@ export default async function PrediccionesPartidosPage() {
         settings={(settings as Settings) ?? null}
         readOnly={false}
         ownerLabel="tu predicción"
+        allPredictions={(allPredictions ?? []) as MatchPrediction[]}
+        profiles={
+          (profiles ?? []) as { id: string; display_name: string }[]
+        }
       />
     </main>
   );
