@@ -90,6 +90,64 @@ export default async function ResumenPage() {
         a.display_name.localeCompare(b.display_name),
     );
 
+  // Movimiento desde la "última jornada": comparamos el ranking actual contra
+  // cómo estaba ANTES del último lote de resultados finalizados (mismo día de
+  // finalized_at, en TZ Bogotá). Si no hay una jornada previa, no mostramos
+  // flechas (sería la primera).
+  const BOGOTA_DAY = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const finalizedResults = (results ?? []).filter(
+    (r) => r.is_finalized && r.finalized_at,
+  ) as MatchResult[];
+  const finalizedDays = finalizedResults.map((r) =>
+    BOGOTA_DAY.format(new Date(r.finalized_at as string)),
+  );
+  const lastJornadaDay =
+    finalizedDays.length > 0 ? [...finalizedDays].sort().at(-1)! : null;
+  const lastJornadaMatchIds = new Set(
+    finalizedResults
+      .filter(
+        (r) =>
+          BOGOTA_DAY.format(new Date(r.finalized_at as string)) ===
+          lastJornadaDay,
+      )
+      .map((r) => r.match_id),
+  );
+  // Solo hay "anterior" si quedan resultados finalizados fuera del último lote.
+  const hasPreviousJornada =
+    lastJornadaDay != null &&
+    finalizedResults.length > lastJornadaMatchIds.size;
+
+  const prevPosById = new Map<string, number>();
+  const prevPtsById = new Map<string, number>();
+  if (hasPreviousJornada) {
+    const resultsAnteriores = new Map<number, MatchResult>();
+    for (const [mid, r] of resultsByMatch) {
+      if (!lastJornadaMatchIds.has(mid)) resultsAnteriores.set(mid, r);
+    }
+    const prevRanked = (profiles ?? [])
+      .map((p) => {
+        const userPreds =
+          predsByUser.get(p.id) ?? new Map<number, MatchPrediction>();
+        const t = totalMatchPoints(matchList, userPreds, resultsAnteriores);
+        return { id: p.id, display_name: p.display_name, total: t.total, exactCount: t.exactCount };
+      })
+      .sort(
+        (a, b) =>
+          b.total - a.total ||
+          b.exactCount - a.exactCount ||
+          a.display_name.localeCompare(b.display_name),
+      );
+    prevRanked.forEach((p, i) => {
+      prevPosById.set(p.id, i + 1);
+      prevPtsById.set(p.id, p.total);
+    });
+  }
+
   // Próximos y recientes
   const now = Date.now();
   const upcoming = matchList
@@ -396,6 +454,12 @@ export default async function ResumenPage() {
                 <th className="px-5 py-2 text-left">Participante</th>
                 <th className="px-5 py-2 text-right">Puntos</th>
                 <th
+                  className="px-3 py-2 text-right"
+                  title="Cambio de posición y puntos desde la última jornada"
+                >
+                  Cambio
+                </th>
+                <th
                   className="px-5 py-2 text-right hidden sm:table-cell"
                   title="Marcadores exactos acertados (usado para desempate)"
                 >
@@ -432,6 +496,20 @@ export default async function ResumenPage() {
                   </td>
                   <td className="px-5 py-2 text-right font-mono font-semibold">
                     {p.total.toString().replace(/\.0$/, "")}
+                  </td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <MovementBadge
+                      deltaPos={
+                        prevPosById.has(p.id)
+                          ? prevPosById.get(p.id)! - (i + 1)
+                          : null
+                      }
+                      deltaPts={
+                        prevPtsById.has(p.id)
+                          ? p.total - prevPtsById.get(p.id)!
+                          : null
+                      }
+                    />
                   </td>
                   <td className="px-5 py-2 text-right font-mono hidden sm:table-cell text-zinc-500">
                     {p.exactCount}
@@ -545,13 +623,13 @@ export default async function ResumenPage() {
                           </div>
                         )}
                       </div>
-                      <div className="text-right w-12">
+                      <div className="text-right w-14">
                         {score ? (
                           <span
-                            className={`font-mono font-semibold ${
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono font-semibold text-xs ${
                               score.total > 0
-                                ? "text-emerald-600 dark:text-emerald-400"
-                                : "text-zinc-500"
+                                ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300"
+                                : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
                             }`}
                           >
                             {score.total > 0 ? "+" : ""}
@@ -562,9 +640,9 @@ export default async function ResumenPage() {
                         )}
                       </div>
                       <span
-                        className={`text-zinc-400 transition-transform ${
+                        className={`flex items-center gap-1 text-sm transition-transform ${
                           expandable
-                            ? "group-open:rotate-180"
+                            ? "text-emerald-500 group-open:rotate-180"
                             : "invisible"
                         }`}
                         aria-hidden
@@ -793,6 +871,48 @@ function Stat({
       </div>
       {sub && <div className="text-xs text-zinc-400">{sub}</div>}
     </div>
+  );
+}
+
+function MovementBadge({
+  deltaPos,
+  deltaPts,
+}: {
+  deltaPos: number | null;
+  deltaPts: number | null;
+}) {
+  if (deltaPos === null) {
+    return <span className="text-xs text-zinc-300 dark:text-zinc-700">—</span>;
+  }
+  const ptsStr =
+    deltaPts && deltaPts > 0
+      ? `+${deltaPts.toString().replace(/\.0$/, "")}`
+      : null;
+  if (deltaPos > 0) {
+    return (
+      <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+        ▲{deltaPos}
+        {ptsStr && <span className="ml-1 font-mono font-normal">{ptsStr}</span>}
+      </span>
+    );
+  }
+  if (deltaPos < 0) {
+    return (
+      <span className="text-xs font-semibold text-red-600 dark:text-red-400">
+        ▼{Math.abs(deltaPos)}
+        {ptsStr && <span className="ml-1 font-mono font-normal">{ptsStr}</span>}
+      </span>
+    );
+  }
+  return (
+    <span className="text-xs text-zinc-500">
+      = se mantuvo
+      {ptsStr && (
+        <span className="ml-1 font-mono text-emerald-600 dark:text-emerald-400">
+          {ptsStr}
+        </span>
+      )}
+    </span>
   );
 }
 
