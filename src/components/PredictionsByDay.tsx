@@ -25,6 +25,11 @@ type Props = {
   ownerLabel: string;
   allPredictions?: MatchPrediction[];
   profiles?: { id: string; display_name: string }[];
+  // "byDay" (default): agrupa por día con tabs y "saltar al próximo".
+  // "flat": lista plana de partidos (ya filtrados por el caller), sin tabs ni
+  // encabezado de día. Útil para incrustar (ej. "Partidos de hoy" en inicio).
+  variant?: "byDay" | "flat";
+  emptyLabel?: string;
 };
 
 // Formato de día en TZ del navegador
@@ -51,6 +56,8 @@ export function PredictionsByDay({
   ownerLabel,
   allPredictions,
   profiles,
+  variant = "byDay",
+  emptyLabel,
 }: Props) {
   // Esperamos a estar en el cliente para agrupar/mostrar con la TZ del navegador.
   // Mientras tanto mostramos un placeholder. Evita mismatch SSR.
@@ -116,11 +123,47 @@ export function PredictionsByDay({
 
   if (matches.length === 0) {
     return (
-      <p className="text-sm text-zinc-500">No hay partidos cargados todavía.</p>
+      <p className="text-sm text-zinc-500 px-4 sm:px-5 py-6">
+        {emptyLabel ?? "No hay partidos cargados todavía."}
+      </p>
     );
   }
 
   const now = Date.now();
+
+  // Modo plano: lista de partidos ya filtrada por el caller (sin tabs ni días).
+  if (variant === "flat") {
+    const visible = matches.filter((m) =>
+      isVisibleForUser(m, readOnly, predictionsByMatch, cutoffMin, now),
+    );
+    if (visible.length === 0) {
+      return (
+        <p className="text-sm text-zinc-500 px-4 sm:px-5 py-6">
+          {emptyLabel ?? "No hay partidos."}
+        </p>
+      );
+    }
+    return (
+      <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+        {visible.map((m) => (
+          <li key={m.id} className="px-4 sm:px-5 py-4">
+            <MatchEntry
+              match={m}
+              teamsById={teamsById}
+              teamsList={teams}
+              prediction={predictionsByMatch.get(m.id) ?? null}
+              result={resultsByMatch.get(m.id) ?? null}
+              cutoffMin={cutoffMin}
+              readOnly={readOnly}
+              ownerLabel={ownerLabel}
+              allPreds={allPredsByMatch.get(m.id) ?? []}
+              profileNameById={profileNameById}
+            />
+          </li>
+        ))}
+      </ul>
+    );
+  }
   // Próximo partido (el primero cuyo kickoff aún no pasa) → día a auto-abrir.
   const nextMatch = matches.find(
     (m) => new Date(m.kickoff_at).getTime() > now,

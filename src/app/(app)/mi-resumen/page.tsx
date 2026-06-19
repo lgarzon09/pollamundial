@@ -6,6 +6,7 @@ import type {
   Match,
   MatchPrediction,
   MatchResult,
+  Settings,
   Team,
   TournamentResults,
 } from "@/lib/db/types";
@@ -14,6 +15,7 @@ import { TeamLabel } from "@/components/TeamLabel";
 import { StageBadge } from "@/components/StageBadge";
 import { LocalDate, LocalTime } from "@/components/LocalDateTime";
 import { KORoundBlock } from "@/components/KORoundBlock";
+import { PredictionsByDay } from "@/components/PredictionsByDay";
 import { BracketScoreBreakdown } from "@/components/BracketScoreBreakdown";
 import { scoreBracket, scoreMatch, totalMatchPoints } from "@/lib/scoring";
 
@@ -168,16 +170,6 @@ export default async function ResumenPage() {
       prevPtsById.set(p.id, p.total);
     });
   }
-
-  // Próximos y recientes
-  const now = Date.now();
-  const upcoming = matchList
-    .filter((m) => new Date(m.kickoff_at).getTime() > now && !resultsByMatch.has(m.id))
-    .slice(0, 5);
-  const recent = matchList
-    .filter((m) => resultsByMatch.has(m.id))
-    .sort((a, b) => new Date(b.kickoff_at).getTime() - new Date(a.kickoff_at).getTime())
-    .slice(0, 5);
 
   // Partidos de HOY (en hora de Bogotá): se juegan o ya se jugaron hoy.
   const todayBogota = BOGOTA_DAY.format(new Date());
@@ -595,7 +587,8 @@ export default async function ResumenPage() {
         )}
       </details>
 
-      {/* Partidos de hoy */}
+      {/* Partidos de hoy — misma experiencia que la lista por partido:
+          editar tu marcador, ver el desglose de puntos y las predicciones de todos. */}
       <details
         open
         className="group rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden"
@@ -614,107 +607,20 @@ export default async function ResumenPage() {
             </span>
           </div>
         </summary>
-        <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-          {todayMatches.length === 0 ? (
-            <p className="px-4 sm:px-5 py-6 text-sm text-zinc-500">
-              No hay partidos hoy.
-            </p>
-          ) : (
-            todayMatches.map((m) => {
-              const home = m.home_team_id ? teamsById.get(m.home_team_id) : null;
-              const away = m.away_team_id ? teamsById.get(m.away_team_id) : null;
-              const r = resultsByMatch.get(m.id) ?? null;
-              const p = predictionsByMatch.get(m.id) ?? null;
-              const score =
-                p && r?.is_finalized ? scoreMatch(m, p, r) : null;
-              return (
-                <div
-                  key={m.id}
-                  className="px-4 sm:px-5 py-3 flex items-center gap-3 text-sm"
-                >
-                  <div className="flex flex-col items-start gap-1 flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <StageBadge stage={m.stage} groupCode={m.group_code} />
-                      <span className="text-xs text-zinc-500">
-                        {<LocalTime iso={m.kickoff_at} />}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 truncate">
-                      <TeamLabel team={home} placeholder={m.home_placeholder} size="sm" />
-                      <span className="text-zinc-400">vs</span>
-                      <TeamLabel team={away} placeholder={m.away_placeholder} size="sm" />
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    {r ? (
-                      <div className="font-mono text-base font-semibold">
-                        {r.home_score_90}–{r.away_score_90}
-                        {r.went_to_penalties && (
-                          <span className="block text-[10px] text-zinc-500 font-normal">
-                            pen.
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-zinc-400 font-mono">
-                        por jugar
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-right w-16 shrink-0">
-                    {score ? (
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono font-semibold text-xs ${
-                          score.total > 0
-                            ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300"
-                            : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
-                        }`}
-                        title="Tus puntos en este partido"
-                      >
-                        {score.total > 0 ? "+" : ""}
-                        {score.total.toString().replace(/\.0$/, "")} pts
-                      </span>
-                    ) : p ? (
-                      <span className="text-[10px] text-zinc-400">
-                        tu: {p.home_score_90}–{p.away_score_90}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-zinc-400">
-                        sin predicción
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </details>
-
-      {/* Próximos partidos */}
-      <details
-        open
-        className="group rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden"
-      >
-        <summary className="px-4 sm:px-5 py-3 cursor-pointer flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800/40 list-none">
-          <h2 className="font-semibold">Próximos partidos</h2>
-          <span
-            className="text-zinc-400 group-open:rotate-180 transition-transform"
-            aria-hidden
-          >
-            ▾
-          </span>
-        </summary>
-        <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-          {upcoming.length === 0 ? (
-            <p className="px-4 sm:px-5 py-6 text-sm text-zinc-500">
-              No hay partidos próximos.
-            </p>
-          ) : (
-            upcoming.map((m) => (
-              <MatchRow key={m.id} match={m} teamsById={teamsById} result={null} />
-            ))
-          )}
+        <div className="border-t border-zinc-100 dark:border-zinc-800">
+          <PredictionsByDay
+            variant="flat"
+            matches={todayMatches}
+            teams={(teams ?? []) as Team[]}
+            predictions={(predictions ?? []) as MatchPrediction[]}
+            results={(results ?? []) as MatchResult[]}
+            settings={(settings as unknown as Settings) ?? null}
+            readOnly={false}
+            ownerLabel="tu predicción"
+            allPredictions={(allPredictions ?? []) as MatchPrediction[]}
+            profiles={(profiles ?? []) as { id: string; display_name: string }[]}
+            emptyLabel="No hay partidos hoy."
+          />
         </div>
       </details>
 
