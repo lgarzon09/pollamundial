@@ -241,6 +241,22 @@ create table if not exists public.tournament_results (
   updated_at timestamptz not null default now()
 );
 
+-- ---------- Tabla: bracket_results (resultado OFICIAL de la predicción general) ----------
+-- Espeja bracket_predictions pero representa la realidad. La carga el admin.
+create table if not exists public.bracket_results (
+  id int primary key default 1 check (id = 1),
+  group_positions jsonb not null default '{}'::jsonb,
+  r32_third_place_assignments jsonb not null default '{}'::jsonb,
+  r32_winners jsonb not null default '{}'::jsonb,
+  r16_winners jsonb not null default '{}'::jsonb,
+  qf_winners jsonb not null default '{}'::jsonb,
+  sf_winners jsonb not null default '{}'::jsonb,
+  finalists jsonb not null default '[]'::jsonb,
+  champion text references public.teams(id),
+  is_finalized boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+
 -- ---------- Tabla: settings (singleton) ----------
 create table if not exists public.settings (
   id int primary key default 1 check (id = 1),
@@ -283,6 +299,7 @@ alter table public.match_results enable row level security;
 alter table public.match_predictions enable row level security;
 alter table public.bracket_predictions enable row level security;
 alter table public.tournament_results enable row level security;
+alter table public.bracket_results enable row level security;
 alter table public.settings enable row level security;
 
 -- profiles: cualquiera autenticado puede leer; solo el dueño actualiza su nombre
@@ -315,6 +332,12 @@ drop policy if exists "tournament_results read" on public.tournament_results;
 create policy "tournament_results read" on public.tournament_results for select to anon, authenticated using (true);
 drop policy if exists "tournament_results write" on public.tournament_results;
 create policy "tournament_results write" on public.tournament_results for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- bracket_results: lectura para autenticados, escritura admin
+drop policy if exists "bracket_results read" on public.bracket_results;
+create policy "bracket_results read" on public.bracket_results for select to authenticated using (true);
+drop policy if exists "bracket_results write" on public.bracket_results;
+create policy "bracket_results write" on public.bracket_results for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
 -- settings: lectura para todos
 drop policy if exists "settings read" on public.settings;

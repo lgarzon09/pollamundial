@@ -1,4 +1,10 @@
-import type { Match, MatchPrediction, MatchResult, MatchStage } from "./db/types";
+import type {
+  Match,
+  MatchPrediction,
+  MatchResult,
+  MatchStage,
+  TournamentResults,
+} from "./db/types";
 
 /**
  * Puntos máximos posibles en un partido según su etapa.
@@ -144,6 +150,179 @@ export function scoreMatch(
       points: koCorrect ? 2 : 0,
       correct: koCorrect,
     });
+  }
+
+  const total = lines.reduce((s, l) => s + l.points, 0);
+  return { total, lines };
+}
+
+// ============================================================
+// Puntuación de la PREDICCIÓN GENERAL (bracket)
+// Compara el bracket del usuario contra el bracket OFICIAL (bracket_results)
+// y los premios oficiales (tournament_results).
+// Reglas (ver RulesExplained.tsx):
+//   Posición exacta en grupo:      3 pts × equipo
+//   Clasifica a Ronda de 32:       5 pts × equipo
+//   Clasifica a octavos (R16):     8 pts × equipo
+//   Clasifica a cuartos (QF):     12 pts × equipo
+//   Clasifica a semifinales (SF): 15 pts × equipo
+//   Equipo finalista:             20 pts × equipo
+//   Campeón:                      30 pts
+//   Goleador 25 · Balón 15 · Guante 15 · Joven 15 · Revelación 15
+// ============================================================
+
+const BRACKET_GROUPS = ["A","B","C","D","E","F","G","H","I","J","K","L"];
+
+// Forma estructural común a BracketPrediction y BracketResults.
+// Los premios (top_scorer, etc.) solo existen en el bracket del usuario.
+export type BracketShape = {
+  group_positions?: Record<string, string[]> | null;
+  r32_third_place_assignments?: Record<string, string> | null;
+  r32_winners?: Record<string, string> | null;
+  r16_winners?: Record<string, string> | null;
+  qf_winners?: Record<string, string> | null;
+  sf_winners?: Record<string, string> | null;
+  finalists?: string[] | null;
+  champion?: string | null;
+  top_scorer?: string | null;
+  golden_ball?: string | null;
+  golden_glove?: string | null;
+  young_player?: string | null;
+  revelation_team?: string | null;
+};
+
+/** Equipos que un bracket "manda" a Ronda de 32: 1° y 2° de cada grupo + los 3° asignados. */
+function r32TeamSet(b: BracketShape): Set<string> {
+  const s = new Set<string>();
+  for (const g of BRACKET_GROUPS) {
+    const pos = b.group_positions?.[g] ?? [];
+    if (pos[0]) s.add(pos[0]);
+    if (pos[1]) s.add(pos[1]);
+  }
+  for (const tid of Object.values(b.r32_third_place_assignments ?? {})) {
+    if (tid) s.add(tid);
+  }
+  return s;
+}
+
+/** Cantidad de equipos en común entre `a` (predicho) y `b` (real), sin contar duplicados. */
+function intersectCount(a: Iterable<string>, b: Set<string>): number {
+  let n = 0;
+  const seen = new Set<string>();
+  for (const x of a) {
+    if (x && b.has(x) && !seen.has(x)) {
+      n++;
+      seen.add(x);
+    }
+  }
+  return n;
+}
+
+/** Finalistas de un bracket: `finalists` si existe, si no los valores de `sf_winners`. */
+function finalistSet(b: BracketShape): Set<string> {
+  const arr =
+    b.finalists && b.finalists.length > 0
+      ? b.finalists
+      : Object.values(b.sf_winners ?? {});
+  return new Set(arr.filter(Boolean));
+}
+
+function sameText(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+export function scoreBracket(
+  user: BracketShape | null,
+  official: BracketShape | null,
+  tournament: TournamentResults | null,
+): MatchScore {
+  const lines: ScoreLine[] = [];
+  if (!user) return { total: 0, lines };
+
+  const off = official ?? {};
+
+  // 1. Posiciones exactas de grupo (3 c/u)
+  let groupHits = 0;
+  for (const g of BRACKET_GROUPS) {
+    const up = user.group_positions?.[g] ?? [];
+    const op = off.group_positions?.[g] ?? [];
+    for (let i = 0; i < 4; i++) {
+      if (up[i] && op[i] && up[i] === op[i]) groupHits++;
+    }
+  }
+  lines.push({
+    label: "Posiciones exactas de grupo",
+    points: groupHits * 3,
+    correct: groupHits > 0,
+    detail: `${groupHits} acierto${groupHits === 1 ? "" : "s"} × 3`,
+  });
+
+  // 2. Clasifican a cada ronda (intersección de equipos)
+  const reaches: { label: string; pts: number; pred: Set<string>; real: Set<string> }[] = [
+    {
+      label: "Clasifican a Ronda de 32",
+      pts: 5,
+      pred: r32TeamSet(user),
+      real: r32TeamSet(off),
+    },
+    {
+      label: "Clasifican a octavos",
+      pts: 8,
+      pred: new Set(Object.values(user.r32_winners ?? {}).filter(Boolean)),
+      real: new Set(Object.values(off.r32_winners ?? {}).filter(Boolean)),
+    },
+    {
+      label: "Clasifican a cuartos",
+      pts: 12,
+      pred: new Set(Object.values(user.r16_winners ?? {}).filter(Boolean)),
+      real: new Set(Object.values(off.r16_winners ?? {}).filter(Boolean)),
+    },
+    {
+      label: "Clasifican a semifinales",
+      pts: 15,
+      pred: new Set(Object.values(user.qf_winners ?? {}).filter(Boolean)),
+      real: new Set(Object.values(off.qf_winners ?? {}).filter(Boolean)),
+    },
+    {
+      label: "Finalistas",
+      pts: 20,
+      pred: finalistSet(user),
+      real: finalistSet(off),
+    },
+  ];
+  for (const r of reaches) {
+    const hits = intersectCount(r.pred, r.real);
+    lines.push({
+      label: r.label,
+      points: hits * r.pts,
+      correct: hits > 0,
+      detail: `${hits} equipo${hits === 1 ? "" : "s"} × ${r.pts}`,
+    });
+  }
+
+  // 3. Campeón (30)
+  const championCorrect = !!user.champion && user.champion === off.champion;
+  lines.push({
+    label: "Campeón del Mundial",
+    points: championCorrect ? 30 : 0,
+    correct: championCorrect,
+  });
+
+  // 4. Premios (vs tournament_results)
+  const awards: { label: string; pts: number; correct: boolean }[] = [
+    { label: "Goleador", pts: 25, correct: sameText(user.top_scorer, tournament?.top_scorer) },
+    { label: "Balón de Oro", pts: 15, correct: sameText(user.golden_ball, tournament?.golden_ball) },
+    { label: "Guante de Oro", pts: 15, correct: sameText(user.golden_glove, tournament?.golden_glove) },
+    { label: "Mejor jugador joven", pts: 15, correct: sameText(user.young_player, tournament?.young_player) },
+    {
+      label: "Equipo revelación",
+      pts: 15,
+      correct: !!user.revelation_team && user.revelation_team === tournament?.revelation_team,
+    },
+  ];
+  for (const a of awards) {
+    lines.push({ label: a.label, points: a.correct ? a.pts : 0, correct: a.correct });
   }
 
   const total = lines.reduce((s, l) => s + l.points, 0);

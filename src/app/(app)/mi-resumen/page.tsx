@@ -2,17 +2,20 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import type {
   BracketPrediction,
+  BracketResults,
   Match,
   MatchPrediction,
   MatchResult,
   Team,
+  TournamentResults,
 } from "@/lib/db/types";
 import { STAGE_SHORT } from "@/lib/db/types";
 import { TeamLabel } from "@/components/TeamLabel";
 import { StageBadge } from "@/components/StageBadge";
 import { LocalDate, LocalTime } from "@/components/LocalDateTime";
 import { KORoundBlock } from "@/components/KORoundBlock";
-import { scoreMatch, totalMatchPoints } from "@/lib/scoring";
+import { BracketScoreBreakdown } from "@/components/BracketScoreBreakdown";
+import { scoreBracket, scoreMatch, totalMatchPoints } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +38,9 @@ export default async function ResumenPage() {
     { data: settings },
     { data: allPredictions },
     { data: myProfile },
+    { data: allBrackets },
+    { data: official },
+    { data: tournament },
   ] = await Promise.all([
     supabase.from("matches").select("*").order("kickoff_at", { ascending: true }),
     supabase.from("match_predictions").select("*").eq("user_id", user.id),
@@ -57,6 +63,9 @@ export default async function ResumenPage() {
       .select("display_name")
       .eq("id", user.id)
       .maybeSingle(),
+    supabase.from("bracket_predictions").select("*"),
+    supabase.from("bracket_results").select("*").eq("id", 1).maybeSingle(),
+    supabase.from("tournament_results").select("*").eq("id", 1).maybeSingle(),
   ]);
 
   const teamsById = new Map<string, Team>((teams ?? []).map((t) => [t.id, t]));
@@ -71,6 +80,13 @@ export default async function ResumenPage() {
   const totals = totalMatchPoints(matchList, predictionsByMatch, resultsByMatch);
   const totalPredicted = predictionsByMatch.size;
 
+  // Bracket oficial (realidad) + premios oficiales para puntuar la predicción general
+  const officialBracket = (official as BracketResults | null) ?? null;
+  const tournamentResults = (tournament as TournamentResults | null) ?? null;
+  const bracketsByUser = new Map<string, BracketPrediction>(
+    ((allBrackets ?? []) as BracketPrediction[]).map((b) => [b.user_id, b]),
+  );
+
   // Ranking de todos los participantes
   const predsByUser = new Map<string, Map<number, MatchPrediction>>();
   for (const p of (allPredictions ?? []) as MatchPrediction[]) {
@@ -81,7 +97,12 @@ export default async function ResumenPage() {
     .map((p) => {
       const userPreds = predsByUser.get(p.id) ?? new Map<number, MatchPrediction>();
       const t = totalMatchPoints(matchList, userPreds, resultsByMatch);
-      return { ...p, total: t.total, exactCount: t.exactCount };
+      const bracketTotal = scoreBracket(
+        bracketsByUser.get(p.id) ?? null,
+        officialBracket,
+        tournamentResults,
+      ).total;
+      return { ...p, total: t.total, exactCount: t.exactCount, bracketTotal };
     })
     .sort(
       (a, b) =>
@@ -158,6 +179,12 @@ export default async function ResumenPage() {
     .sort((a, b) => new Date(b.kickoff_at).getTime() - new Date(a.kickoff_at).getTime())
     .slice(0, 5);
 
+  // Partidos de HOY (en hora de Bogotá): se juegan o ya se jugaron hoy.
+  const todayBogota = BOGOTA_DAY.format(new Date());
+  const todayMatches = matchList.filter(
+    (m) => BOGOTA_DAY.format(new Date(m.kickoff_at)) === todayBogota,
+  );
+
   // Bracket CTA
   const tournamentStart = settings?.tournament_start_at
     ? new Date(settings.tournament_start_at)
@@ -175,6 +202,25 @@ export default async function ResumenPage() {
 
   const myRank = rankedProfiles.findIndex((p) => p.id === user.id) + 1;
   const br = (bracket as BracketPrediction | null) ?? null;
+
+  // ¿El admin ya cargó algo del resultado oficial / premios?
+  const officialDataReady =
+    (!!officialBracket &&
+      (Object.keys(officialBracket.group_positions ?? {}).length > 0 ||
+        !!officialBracket.champion ||
+        Object.keys(officialBracket.r32_winners ?? {}).length > 0)) ||
+    (!!tournamentResults &&
+      !!(
+        tournamentResults.top_scorer ||
+        tournamentResults.golden_ball ||
+        tournamentResults.golden_glove ||
+        tournamentResults.young_player ||
+        tournamentResults.revelation_team
+      ));
+  const myBracketScore =
+    br && officialDataReady
+      ? scoreBracket(br, officialBracket, tournamentResults)
+      : null;
 
   // ¿Predicción general "completa"? (12 grupos + R32 + R16 + QF + SF + campeón + 5 premios)
   const countJsonbKeys = (obj: Record<string, string> | undefined) =>
@@ -447,12 +493,24 @@ export default async function ResumenPage() {
             Aún no hay participantes. Comparte el link con tus amigos.
           </p>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[680px]">
             <thead className="bg-zinc-50 dark:bg-zinc-950/40 text-zinc-600 dark:text-zinc-400">
               <tr>
                 <th className="px-5 py-2 text-left w-12">#</th>
                 <th className="px-5 py-2 text-left">Participante</th>
-                <th className="px-5 py-2 text-right">Puntos</th>
+                <th
+                  className="px-5 py-2 text-right"
+                  title="Puntos de las predicciones por partido"
+                >
+                  Puntos
+                </th>
+                <th
+                  className="px-3 py-2 text-right"
+                  title="Puntos de la predicción general (bracket). El detalle se ve en cada perfil."
+                >
+                  General
+                </th>
                 <th
                   className="px-3 py-2 text-right"
                   title="Cambio de posición desde la última jornada"
@@ -466,7 +524,7 @@ export default async function ResumenPage() {
                   Δ pts
                 </th>
                 <th
-                  className="px-5 py-2 text-right hidden sm:table-cell"
+                  className="px-5 py-2 text-right"
                   title="Marcadores exactos acertados (usado para desempate)"
                 >
                   Marcadores exactos
@@ -503,6 +561,11 @@ export default async function ResumenPage() {
                   <td className="px-5 py-2 text-right font-mono font-semibold">
                     {p.total.toString().replace(/\.0$/, "")}
                   </td>
+                  <td className="px-3 py-2 text-right font-mono text-zinc-500">
+                    {p.bracketTotal > 0
+                      ? p.bracketTotal.toString().replace(/\.0$/, "")
+                      : "—"}
+                  </td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
                     <PositionDelta
                       deltaPos={
@@ -521,14 +584,111 @@ export default async function ResumenPage() {
                       }
                     />
                   </td>
-                  <td className="px-5 py-2 text-right font-mono hidden sm:table-cell text-zinc-500">
+                  <td className="px-5 py-2 text-right font-mono text-zinc-500">
                     {p.exactCount}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         )}
+      </details>
+
+      {/* Partidos de hoy */}
+      <details
+        open
+        className="group rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden"
+      >
+        <summary className="px-4 sm:px-5 py-3 cursor-pointer flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800/40 list-none">
+          <h2 className="font-semibold">Partidos de hoy</h2>
+          <div className="flex items-center gap-3 text-sm">
+            <span className="text-xs text-zinc-500">
+              {todayMatches.length} partido{todayMatches.length === 1 ? "" : "s"}
+            </span>
+            <span
+              className="text-zinc-400 group-open:rotate-180 transition-transform"
+              aria-hidden
+            >
+              ▾
+            </span>
+          </div>
+        </summary>
+        <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+          {todayMatches.length === 0 ? (
+            <p className="px-4 sm:px-5 py-6 text-sm text-zinc-500">
+              No hay partidos hoy.
+            </p>
+          ) : (
+            todayMatches.map((m) => {
+              const home = m.home_team_id ? teamsById.get(m.home_team_id) : null;
+              const away = m.away_team_id ? teamsById.get(m.away_team_id) : null;
+              const r = resultsByMatch.get(m.id) ?? null;
+              const p = predictionsByMatch.get(m.id) ?? null;
+              const score =
+                p && r?.is_finalized ? scoreMatch(m, p, r) : null;
+              return (
+                <div
+                  key={m.id}
+                  className="px-4 sm:px-5 py-3 flex items-center gap-3 text-sm"
+                >
+                  <div className="flex flex-col items-start gap-1 flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <StageBadge stage={m.stage} groupCode={m.group_code} />
+                      <span className="text-xs text-zinc-500">
+                        {<LocalTime iso={m.kickoff_at} />}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 truncate">
+                      <TeamLabel team={home} placeholder={m.home_placeholder} size="sm" />
+                      <span className="text-zinc-400">vs</span>
+                      <TeamLabel team={away} placeholder={m.away_placeholder} size="sm" />
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    {r ? (
+                      <div className="font-mono text-base font-semibold">
+                        {r.home_score_90}–{r.away_score_90}
+                        {r.went_to_penalties && (
+                          <span className="block text-[10px] text-zinc-500 font-normal">
+                            pen.
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-zinc-400 font-mono">
+                        por jugar
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right w-16 shrink-0">
+                    {score ? (
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono font-semibold text-xs ${
+                          score.total > 0
+                            ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300"
+                            : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+                        }`}
+                        title="Tus puntos en este partido"
+                      >
+                        {score.total > 0 ? "+" : ""}
+                        {score.total.toString().replace(/\.0$/, "")} pts
+                      </span>
+                    ) : p ? (
+                      <span className="text-[10px] text-zinc-400">
+                        tu: {p.home_score_90}–{p.away_score_90}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-zinc-400">
+                        sin predicción
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </details>
 
       {/* Próximos partidos */}
@@ -738,6 +898,13 @@ export default async function ResumenPage() {
           </p>
         ) : (
           <div className="p-5 space-y-5">
+            {myBracketScore && (
+              <BracketScoreBreakdown
+                score={myBracketScore}
+                title="Puntos de tu predicción general"
+                hint="Suma a medida que el admin carga el resultado real del torneo. No está incluido en la columna 'Puntos' del ranking."
+              />
+            )}
             <div>
               <p className="text-xs uppercase tracking-wider text-zinc-500 font-semibold mb-1">
                 Última actualización

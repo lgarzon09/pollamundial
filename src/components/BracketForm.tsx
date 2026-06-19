@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { saveBracket } from "@/app/(app)/predicciones/general/actions";
+import {
+  saveBracket,
+  type BracketDraftInput,
+} from "@/app/(app)/predicciones/general/actions";
 import type {
   BracketPrediction,
   Match,
@@ -17,9 +20,15 @@ import {
 type Props = {
   teams: Team[];
   koMatches: Match[]; // todos los partidos no-grupo (R32..Final + tercer puesto)
-  initial: BracketPrediction | null;
+  initial: Partial<BracketPrediction> | null;
   readOnly: boolean;
   tournamentStartIso: string | null;
+  // "user" (default): predicción del participante. "official": resultado real (admin).
+  variant?: "user" | "official";
+  // Acción de guardado. Default: saveBracket (predicción del usuario).
+  saveAction?: (
+    input: BracketDraftInput,
+  ) => Promise<{ ok?: boolean; error?: string } | undefined>;
 };
 
 const GROUPS = ["A","B","C","D","E","F","G","H","I","J","K","L"];
@@ -30,7 +39,10 @@ export function BracketForm({
   initial,
   readOnly,
   tournamentStartIso,
+  variant = "user",
+  saveAction = saveBracket,
 }: Props) {
+  const isOfficial = variant === "official";
   const teamsById = useMemo(
     () => new Map(teams.map((t) => [t.id, t])),
     [teams],
@@ -194,7 +206,7 @@ export function BracketForm({
     setError(null);
     setMessage(null);
     startTransition(async () => {
-      const res = await saveBracket({
+      const res = await saveAction({
         group_positions: groupPositions,
         r32_third_place_assignments: r32ThirdPlace,
         r32_winners: r32Winners,
@@ -210,7 +222,12 @@ export function BracketForm({
         revelation_team: revelationTeam || null,
       });
       if (res?.error) setError(res.error);
-      else setMessage("Cambios guardados. Puedes seguir editando hasta el inicio del Mundial.");
+      else
+        setMessage(
+          isOfficial
+            ? "Resultado oficial guardado. Los puntos de la predicción general se recalculan con esto."
+            : "Cambios guardados. Puedes seguir editando hasta el inicio del Mundial.",
+        );
     });
   }
 
@@ -500,7 +517,8 @@ export function BracketForm({
         )}
       </section>
 
-      {/* Premios especiales */}
+      {/* Premios especiales (en modo oficial se cargan aparte, en tournament_results) */}
+      {!isOfficial && (
       <section className="space-y-4">
         <h2 className="text-xl font-bold">7. Premios especiales</h2>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -558,6 +576,7 @@ export function BracketForm({
           </div>
         </div>
       </section>
+      )}
 
       {!readOnly && (
         <div className="flex justify-end pt-4 border-t border-zinc-200 dark:border-zinc-800">

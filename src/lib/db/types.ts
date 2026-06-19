@@ -99,6 +99,22 @@ export type BracketPrediction = {
   updated_at: string;
 };
 
+// Resultado OFICIAL de la predicción general (lo carga el admin).
+// Misma forma que BracketPrediction pero sin user_id y con is_finalized.
+export type BracketResults = {
+  id: 1;
+  group_positions: Record<string, string[]>;
+  r32_third_place_assignments: Record<string, string>;
+  r32_winners: Record<string, string>;
+  r16_winners: Record<string, string>;
+  qf_winners: Record<string, string>;
+  sf_winners: Record<string, string>;
+  finalists: string[];
+  champion: string | null;
+  is_finalized: boolean;
+  updated_at: string;
+};
+
 export type TournamentResults = {
   id: 1;
   top_scorer: string | null;

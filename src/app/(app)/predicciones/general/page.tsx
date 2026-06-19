@@ -1,9 +1,42 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import type { BracketPrediction, Match, Team } from "@/lib/db/types";
+import type {
+  BracketPrediction,
+  BracketResults,
+  Match,
+  Team,
+  TournamentResults,
+} from "@/lib/db/types";
 import { BracketForm } from "@/components/BracketForm";
+import { BracketScoreBreakdown } from "@/components/BracketScoreBreakdown";
+import { scoreBracket } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
+
+// ¿El bracket oficial / premios ya tienen algún dato cargado por el admin?
+function hasOfficialData(
+  official: BracketResults | null,
+  tournament: TournamentResults | null,
+): boolean {
+  if (official) {
+    if (Object.keys(official.group_positions ?? {}).length > 0) return true;
+    if (official.champion) return true;
+    for (const k of ["r32_winners", "r16_winners", "qf_winners", "sf_winners"] as const) {
+      if (Object.keys(official[k] ?? {}).length > 0) return true;
+    }
+  }
+  if (tournament) {
+    if (
+      tournament.top_scorer ||
+      tournament.golden_ball ||
+      tournament.golden_glove ||
+      tournament.young_player ||
+      tournament.revelation_team
+    )
+      return true;
+  }
+  return false;
+}
 
 export default async function PrediccionGeneralPage() {
   const supabase = await createClient();
@@ -12,25 +45,42 @@ export default async function PrediccionGeneralPage() {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [{ data: settings }, { data: teams }, { data: matches }, { data: bracket }] =
-    await Promise.all([
-      supabase
-        .from("settings")
-        .select("tournament_start_at")
-        .eq("id", 1)
-        .maybeSingle(),
-      supabase.from("teams").select("*").order("name", { ascending: true }),
-      supabase
-        .from("matches")
-        .select("*")
-        .neq("stage", "group")
-        .order("id", { ascending: true }),
-      supabase
-        .from("bracket_predictions")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-    ]);
+  const [
+    { data: settings },
+    { data: teams },
+    { data: matches },
+    { data: bracket },
+    { data: official },
+    { data: tournament },
+  ] = await Promise.all([
+    supabase
+      .from("settings")
+      .select("tournament_start_at")
+      .eq("id", 1)
+      .maybeSingle(),
+    supabase.from("teams").select("*").order("name", { ascending: true }),
+    supabase
+      .from("matches")
+      .select("*")
+      .neq("stage", "group")
+      .order("id", { ascending: true }),
+    supabase
+      .from("bracket_predictions")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    supabase.from("bracket_results").select("*").eq("id", 1).maybeSingle(),
+    supabase.from("tournament_results").select("*").eq("id", 1).maybeSingle(),
+  ]);
+
+  const officialBracket = (official as BracketResults | null) ?? null;
+  const tournamentResults = (tournament as TournamentResults | null) ?? null;
+  const userBracket = (bracket as BracketPrediction | null) ?? null;
+  const showScore =
+    !!userBracket && hasOfficialData(officialBracket, tournamentResults);
+  const bracketScore = showScore
+    ? scoreBracket(userBracket, officialBracket, tournamentResults)
+    : null;
 
   const tournamentStart = settings?.tournament_start_at
     ? new Date(settings.tournament_start_at)
@@ -64,10 +114,17 @@ export default async function PrediccionGeneralPage() {
         </div>
       )}
 
+      {bracketScore && (
+        <BracketScoreBreakdown
+          score={bracketScore}
+          hint="Suma a medida que el admin carga el resultado real del torneo. Es independiente de tus predicciones por partido."
+        />
+      )}
+
       <BracketForm
         teams={(teams ?? []) as Team[]}
         koMatches={(matches ?? []) as Match[]}
-        initial={(bracket as BracketPrediction | null) ?? null}
+        initial={userBracket}
         readOnly={readOnly}
         tournamentStartIso={tournamentStart?.toISOString() ?? null}
       />
