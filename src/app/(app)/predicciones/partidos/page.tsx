@@ -7,6 +7,7 @@ import type {
   Team,
 } from "@/lib/db/types";
 import { PredictionsByDay } from "@/components/PredictionsByDay";
+import { fetchAllRows } from "@/lib/db/fetchAll";
 
 export const dynamic = "force-dynamic";
 
@@ -32,8 +33,15 @@ export default async function PrediccionesPartidosPage() {
     supabase.from("teams").select("*"),
     supabase.from("settings").select("*").eq("id", 1).maybeSingle(),
     // Todas las predicciones: la RLS solo expone las ajenas tras el cierre del
-    // partido, así que aquí llegan únicamente las visibles.
-    supabase.from("match_predictions").select("*"),
+    // partido, así que aquí llegan únicamente las visibles. Paginado porque la
+    // tabla supera las 1000 filas y un select() plano se truncaría.
+    fetchAllRows<MatchPrediction>((from, to) =>
+      supabase
+        .from("match_predictions")
+        .select("*")
+        .order("id", { ascending: true })
+        .range(from, to),
+    ).then((data) => ({ data })),
     supabase.from("profiles").select("id, display_name"),
   ]);
 

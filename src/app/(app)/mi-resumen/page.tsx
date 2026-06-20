@@ -18,6 +18,7 @@ import { KORoundBlock } from "@/components/KORoundBlock";
 import { PredictionsByDay } from "@/components/PredictionsByDay";
 import { BracketScoreBreakdown } from "@/components/BracketScoreBreakdown";
 import { scoreBracket, scoreMatch, totalMatchPoints } from "@/lib/scoring";
+import { fetchAllRows } from "@/lib/db/fetchAll";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +60,15 @@ export default async function ResumenPage() {
       .select("tournament_start_at, match_prediction_cutoff_minutes")
       .eq("id", 1)
       .maybeSingle(),
-    supabase.from("match_predictions").select("*"),
+    // Todas las predicciones, paginadas: la tabla supera las 1000 filas y un
+    // select() plano se truncaría, corrompiendo puntos/orden del ranking.
+    fetchAllRows<MatchPrediction>((from, to) =>
+      supabase
+        .from("match_predictions")
+        .select("*")
+        .order("id", { ascending: true })
+        .range(from, to),
+    ).then((data) => ({ data })),
     supabase
       .from("profiles")
       .select("display_name")
