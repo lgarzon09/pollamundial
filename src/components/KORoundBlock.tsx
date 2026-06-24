@@ -1,15 +1,19 @@
 import type { Match, Team } from "@/lib/db/types";
+import { PointsBadge } from "./PointsBadge";
 
 export function KORoundBlock({
   title,
   matches,
   winners,
   teamsById,
+  points,
 }: {
   title: string;
   matches: Match[];
   winners: Record<string, string>;
   teamsById: Map<string, Team>;
+  /** Puntos por match_id del pick (opcional, sólo cuando hay resultado oficial). */
+  points?: Record<string, number>;
 }) {
   if (matches.length === 0) return null;
   const ordered = [...matches].sort((a, b) => a.id - b.id);
@@ -22,6 +26,7 @@ export function KORoundBlock({
         {ordered.map((m) => {
           const teamId = winners[m.id.toString()];
           const team = teamId ? teamsById.get(teamId) : null;
+          const earned = points?.[m.id.toString()];
           return (
             <li
               key={m.id}
@@ -34,6 +39,7 @@ export function KORoundBlock({
                 {team ? (
                   <>
                     {team.flag_emoji} {team.name}
+                    <PointsBadge points={earned} />
                   </>
                 ) : (
                   <span className="text-zinc-400 italic text-xs">sin pick</span>

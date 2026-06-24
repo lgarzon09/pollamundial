@@ -17,7 +17,13 @@ import { LocalDate, LocalTime } from "@/components/LocalDateTime";
 import { KORoundBlock } from "@/components/KORoundBlock";
 import { PredictionsByDay } from "@/components/PredictionsByDay";
 import { BracketScoreBreakdown } from "@/components/BracketScoreBreakdown";
-import { scoreBracket, scoreMatch, totalMatchPoints } from "@/lib/scoring";
+import { PointsBadge } from "@/components/PointsBadge";
+import {
+  bracketPickPoints,
+  scoreBracket,
+  scoreMatch,
+  totalMatchPoints,
+} from "@/lib/scoring";
 import { fetchAllRows } from "@/lib/db/fetchAll";
 
 export const dynamic = "force-dynamic";
@@ -245,6 +251,11 @@ export default async function ResumenPage() {
   const myBracketScore =
     br && officialDataReady
       ? scoreBracket(br, officialBracket, tournamentResults, teamsById)
+      : null;
+  // Puntos por cada selección del bracket, para mostrarlos al lado de cada pick.
+  const pickPts =
+    br && officialDataReady
+      ? bracketPickPoints(br, officialBracket, tournamentResults)
       : null;
 
   // ¿Predicción general "completa"? (12 grupos + R32 + R16 + QF + SF + campeón + 5 premios)
@@ -908,6 +919,7 @@ export default async function ResumenPage() {
                               {t ? (
                                 <span>
                                   {t.flag_emoji} {t.name}
+                                  <PointsBadge points={pickPts?.groupPositions[g]?.[i]} />
                                 </span>
                               ) : (
                                 <span className="text-zinc-400 italic">—</span>
@@ -927,24 +939,28 @@ export default async function ResumenPage() {
               matches={matchList.filter((m) => m.stage === "r32")}
               winners={br.r32_winners ?? {}}
               teamsById={teamsById}
+              points={pickPts?.koWinners}
             />
             <KORoundBlock
               title="Octavos de final"
               matches={matchList.filter((m) => m.stage === "r16")}
               winners={br.r16_winners ?? {}}
               teamsById={teamsById}
+              points={pickPts?.koWinners}
             />
             <KORoundBlock
               title="Cuartos de final"
               matches={matchList.filter((m) => m.stage === "qf")}
               winners={br.qf_winners ?? {}}
               teamsById={teamsById}
+              points={pickPts?.koWinners}
             />
             <KORoundBlock
               title="Semifinales"
               matches={matchList.filter((m) => m.stage === "sf")}
               winners={br.sf_winners ?? {}}
               teamsById={teamsById}
+              points={pickPts?.koWinners}
             />
 
             <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
@@ -952,16 +968,18 @@ export default async function ResumenPage() {
                 label="Campeón"
                 team={br.champion ? teamsById.get(br.champion) : null}
                 points="30 pts"
+                earned={pickPts?.champion}
               />
               <BracketRow
                 label="Equipo revelación"
                 team={br.revelation_team ? teamsById.get(br.revelation_team) : null}
                 points="15 pts"
+                earned={pickPts?.revelationTeam}
               />
-              <BracketText label="Goleador" value={br.top_scorer} points="25 pts" />
-              <BracketText label="Balón de Oro" value={br.golden_ball} points="15 pts" />
-              <BracketText label="Guante de Oro" value={br.golden_glove} points="15 pts" />
-              <BracketText label="Mejor jugador joven" value={br.young_player} points="15 pts" />
+              <BracketText label="Goleador" value={br.top_scorer} points="25 pts" earned={pickPts?.topScorer} />
+              <BracketText label="Balón de Oro" value={br.golden_ball} points="15 pts" earned={pickPts?.goldenBall} />
+              <BracketText label="Guante de Oro" value={br.golden_glove} points="15 pts" earned={pickPts?.goldenGlove} />
+              <BracketText label="Mejor jugador joven" value={br.young_player} points="15 pts" earned={pickPts?.youngPlayer} />
             </div>
           </div>
         )}
@@ -1040,10 +1058,12 @@ function BracketRow({
   label,
   team,
   points,
+  earned,
 }: {
   label: string;
   team: Team | null | undefined;
   points: string;
+  earned?: number;
 }) {
   return (
     <div className="flex items-center justify-between border-b border-dotted border-zinc-200 dark:border-zinc-800 pb-1.5">
@@ -1052,6 +1072,7 @@ function BracketRow({
         {team ? (
           <>
             {team.flag_emoji} <strong>{team.name}</strong>
+            <PointsBadge points={earned} />
           </>
         ) : (
           <span className="text-zinc-400 italic">— ({points})</span>
@@ -1065,17 +1086,22 @@ function BracketText({
   label,
   value,
   points,
+  earned,
 }: {
   label: string;
   value: string | null;
   points: string;
+  earned?: number;
 }) {
   return (
     <div className="flex items-center justify-between border-b border-dotted border-zinc-200 dark:border-zinc-800 pb-1.5">
       <span className="text-zinc-500">{label}</span>
       <span>
         {value ? (
-          <strong>{value}</strong>
+          <>
+            <strong>{value}</strong>
+            <PointsBadge points={earned} />
+          </>
         ) : (
           <span className="text-zinc-400 italic">— ({points})</span>
         )}

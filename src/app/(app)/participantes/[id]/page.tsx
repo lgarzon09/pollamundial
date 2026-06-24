@@ -14,7 +14,8 @@ import type {
 import { PredictionsByDay } from "@/components/PredictionsByDay";
 import { KORoundBlock } from "@/components/KORoundBlock";
 import { BracketScoreBreakdown } from "@/components/BracketScoreBreakdown";
-import { scoreBracket } from "@/lib/scoring";
+import { PointsBadge } from "@/components/PointsBadge";
+import { bracketPickPoints, scoreBracket } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +92,10 @@ export default async function ParticipanteDetalle({
   const bracketScore =
     br && officialDataReady
       ? scoreBracket(br, officialBracket, tournamentResults, teamsById)
+      : null;
+  const pickPts =
+    br && officialDataReady
+      ? bracketPickPoints(br, officialBracket, tournamentResults)
       : null;
 
   return (
@@ -189,6 +194,7 @@ export default async function ParticipanteDetalle({
                               {t ? (
                                 <span>
                                   {t.flag_emoji} {t.name}
+                                  <PointsBadge points={pickPts?.groupPositions[g]?.[i]} />
                                 </span>
                               ) : (
                                 <span className="text-zinc-400 italic">—</span>
@@ -208,24 +214,28 @@ export default async function ParticipanteDetalle({
               matches={matchList.filter((m) => m.stage === "r32")}
               winners={br.r32_winners ?? {}}
               teamsById={teamsById}
+              points={pickPts?.koWinners}
             />
             <KORoundBlock
               title="Octavos de final"
               matches={matchList.filter((m) => m.stage === "r16")}
               winners={br.r16_winners ?? {}}
               teamsById={teamsById}
+              points={pickPts?.koWinners}
             />
             <KORoundBlock
               title="Cuartos de final"
               matches={matchList.filter((m) => m.stage === "qf")}
               winners={br.qf_winners ?? {}}
               teamsById={teamsById}
+              points={pickPts?.koWinners}
             />
             <KORoundBlock
               title="Semifinales"
               matches={matchList.filter((m) => m.stage === "sf")}
               winners={br.sf_winners ?? {}}
               teamsById={teamsById}
+              points={pickPts?.koWinners}
             />
 
             <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
@@ -236,6 +246,7 @@ export default async function ParticipanteDetalle({
                     ? `${teamsById.get(br.champion)?.flag_emoji ?? ""} ${teamsById.get(br.champion)?.name ?? "?"}`
                     : null
                 }
+                earned={pickPts?.champion}
               />
               <BracketLine
                 label="Equipo revelación"
@@ -244,11 +255,12 @@ export default async function ParticipanteDetalle({
                     ? `${teamsById.get(br.revelation_team)?.flag_emoji ?? ""} ${teamsById.get(br.revelation_team)?.name ?? "?"}`
                     : null
                 }
+                earned={pickPts?.revelationTeam}
               />
-              <BracketLine label="Goleador" value={br.top_scorer} />
-              <BracketLine label="Balón de Oro" value={br.golden_ball} />
-              <BracketLine label="Guante de Oro" value={br.golden_glove} />
-              <BracketLine label="Mejor jugador joven" value={br.young_player} />
+              <BracketLine label="Goleador" value={br.top_scorer} earned={pickPts?.topScorer} />
+              <BracketLine label="Balón de Oro" value={br.golden_ball} earned={pickPts?.goldenBall} />
+              <BracketLine label="Guante de Oro" value={br.golden_glove} earned={pickPts?.goldenGlove} />
+              <BracketLine label="Mejor jugador joven" value={br.young_player} earned={pickPts?.youngPlayer} />
             </div>
           </div>
         )}
@@ -257,11 +269,28 @@ export default async function ParticipanteDetalle({
   );
 }
 
-function BracketLine({ label, value }: { label: string; value: string | null }) {
+function BracketLine({
+  label,
+  value,
+  earned,
+}: {
+  label: string;
+  value: string | null;
+  earned?: number;
+}) {
   return (
     <div className="flex items-center justify-between border-b border-dotted border-zinc-200 dark:border-zinc-800 pb-1.5">
       <span className="text-zinc-500">{label}</span>
-      <span>{value || <span className="text-zinc-400 italic">—</span>}</span>
+      <span>
+        {value ? (
+          <>
+            {value}
+            <PointsBadge points={earned} />
+          </>
+        ) : (
+          <span className="text-zinc-400 italic">—</span>
+        )}
+      </span>
     </div>
   );
 }

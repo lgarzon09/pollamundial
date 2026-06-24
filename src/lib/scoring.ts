@@ -359,6 +359,105 @@ export function scoreBracket(
 }
 
 /**
+ * Puntos atribuibles a CADA selección individual del bracket, para mostrarlos
+ * al lado de cada pick en la visualización de la predicción general.
+ * Usa exactamente las mismas reglas que scoreBracket().
+ */
+export type BracketPickPoints = {
+  /** Por grupo, puntos de cada slot 0..3 (posición exacta +3, +5 si clasifica a R32). */
+  groupPositions: Record<string, number[]>;
+  /** Por match_id (string) del pick KO: r32/r16/qf/sf winners. */
+  koWinners: Record<string, number>;
+  champion: number;
+  revelationTeam: number;
+  topScorer: number;
+  goldenBall: number;
+  goldenGlove: number;
+  youngPlayer: number;
+};
+
+export function bracketPickPoints(
+  user: BracketShape | null,
+  official: BracketShape | null,
+  tournament: TournamentResults | null,
+): BracketPickPoints {
+  const empty: BracketPickPoints = {
+    groupPositions: {},
+    koWinners: {},
+    champion: 0,
+    revelationTeam: 0,
+    topScorer: 0,
+    goldenBall: 0,
+    goldenGlove: 0,
+    youngPlayer: 0,
+  };
+  if (!user) return empty;
+  const off = official ?? {};
+
+  const userR32 = r32TeamSet(user);
+  const offR32 = r32TeamSet(off);
+
+  const groupPositions: Record<string, number[]> = {};
+  for (const g of BRACKET_GROUPS) {
+    const up = user.group_positions?.[g] ?? [];
+    const op = off.group_positions?.[g] ?? [];
+    const arr = [0, 0, 0, 0];
+    for (let i = 0; i < 4; i++) {
+      const t = up[i];
+      if (!t) continue;
+      let pts = 0;
+      if (op[i] && t === op[i]) pts += 3; // posición exacta
+      if (userR32.has(t) && offR32.has(t)) pts += 5; // clasifica a R32
+      arr[i] = pts;
+    }
+    groupPositions[g] = arr;
+  }
+
+  const koWinners: Record<string, number> = {};
+  const rounds: {
+    winners?: Record<string, string> | null;
+    real: Set<string>;
+    pts: number;
+  }[] = [
+    {
+      winners: user.r32_winners,
+      real: new Set(Object.values(off.r32_winners ?? {}).filter(Boolean)),
+      pts: 8,
+    },
+    {
+      winners: user.r16_winners,
+      real: new Set(Object.values(off.r16_winners ?? {}).filter(Boolean)),
+      pts: 12,
+    },
+    {
+      winners: user.qf_winners,
+      real: new Set(Object.values(off.qf_winners ?? {}).filter(Boolean)),
+      pts: 15,
+    },
+    { winners: user.sf_winners, real: finalistSet(off), pts: 20 },
+  ];
+  for (const r of rounds) {
+    for (const [mid, t] of Object.entries(r.winners ?? {})) {
+      if (t && r.real.has(t)) koWinners[mid] = r.pts;
+    }
+  }
+
+  return {
+    groupPositions,
+    koWinners,
+    champion: !!user.champion && user.champion === off.champion ? 30 : 0,
+    revelationTeam:
+      !!user.revelation_team && user.revelation_team === tournament?.revelation_team
+        ? 15
+        : 0,
+    topScorer: sameText(user.top_scorer, tournament?.top_scorer) ? 25 : 0,
+    goldenBall: sameText(user.golden_ball, tournament?.golden_ball) ? 15 : 0,
+    goldenGlove: sameText(user.golden_glove, tournament?.golden_glove) ? 15 : 0,
+    youngPlayer: sameText(user.young_player, tournament?.young_player) ? 15 : 0,
+  };
+}
+
+/**
  * Suma los puntos totales del usuario en todos los partidos con resultado finalizado.
  */
 export function totalMatchPoints(
