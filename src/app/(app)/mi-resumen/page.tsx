@@ -112,12 +112,20 @@ export default async function ResumenPage() {
         bracketsByUser.get(p.id) ?? null,
         officialBracket,
         tournamentResults,
+        teamsById,
       ).total;
-      return { ...p, total: t.total, exactCount: t.exactCount, bracketTotal };
+      return {
+        ...p,
+        total: t.total,
+        exactCount: t.exactCount,
+        bracketTotal,
+        // El TOTAL (general + por partido) define el puesto en el ranking.
+        grandTotal: t.total + bracketTotal,
+      };
     })
     .sort(
       (a, b) =>
-        b.total - a.total ||
+        b.grandTotal - a.grandTotal ||
         b.exactCount - a.exactCount ||
         a.display_name.localeCompare(b.display_name),
     );
@@ -166,17 +174,30 @@ export default async function ResumenPage() {
         const userPreds =
           predsByUser.get(p.id) ?? new Map<number, MatchPrediction>();
         const t = totalMatchPoints(matchList, userPreds, resultsAnteriores);
-        return { id: p.id, display_name: p.display_name, total: t.total, exactCount: t.exactCount };
+        // La predicción general no cambia entre jornadas, así que el "total"
+        // anterior es el de por partido (de antes) + el general (actual).
+        const bracketTotal = scoreBracket(
+          bracketsByUser.get(p.id) ?? null,
+          officialBracket,
+          tournamentResults,
+          teamsById,
+        ).total;
+        return {
+          id: p.id,
+          display_name: p.display_name,
+          exactCount: t.exactCount,
+          grandTotal: t.total + bracketTotal,
+        };
       })
       .sort(
         (a, b) =>
-          b.total - a.total ||
+          b.grandTotal - a.grandTotal ||
           b.exactCount - a.exactCount ||
           a.display_name.localeCompare(b.display_name),
       );
     prevRanked.forEach((p, i) => {
       prevPosById.set(p.id, i + 1);
-      prevPtsById.set(p.id, p.total);
+      prevPtsById.set(p.id, p.grandTotal);
     });
   }
 
@@ -202,6 +223,9 @@ export default async function ResumenPage() {
     : null;
 
   const myRank = rankedProfiles.findIndex((p) => p.id === user.id) + 1;
+  const myEntry = rankedProfiles.find((p) => p.id === user.id);
+  const myGrandTotal = myEntry?.grandTotal ?? totals.total;
+  const myBracketTotal = myEntry?.bracketTotal ?? 0;
   const br = (bracket as BracketPrediction | null) ?? null;
 
   // ¿El admin ya cargó algo del resultado oficial / premios?
@@ -220,7 +244,7 @@ export default async function ResumenPage() {
       ));
   const myBracketScore =
     br && officialDataReady
-      ? scoreBracket(br, officialBracket, tournamentResults)
+      ? scoreBracket(br, officialBracket, tournamentResults, teamsById)
       : null;
 
   // ¿Predicción general "completa"? (12 grupos + R32 + R16 + QF + SF + campeón + 5 premios)
@@ -455,7 +479,12 @@ export default async function ResumenPage() {
           sub={`de ${rankedProfiles.length} participantes`}
           highlight
         />
-        <Stat label="Tus puntos" value={totals.total} highlight />
+        <Stat
+          label="Tus puntos (total)"
+          value={myGrandTotal}
+          sub={`${totals.total} por partido · ${myBracketTotal} general`}
+          highlight
+        />
         <Stat
           label="Marcadores exactos acertados"
           value={totals.exactCount}
@@ -495,22 +524,28 @@ export default async function ResumenPage() {
           </p>
         ) : (
           <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[680px]">
+          <table className="w-full text-sm min-w-[760px]">
             <thead className="bg-zinc-50 dark:bg-zinc-950/40 text-zinc-600 dark:text-zinc-400">
               <tr>
                 <th className="px-5 py-2 text-left w-12">#</th>
                 <th className="px-5 py-2 text-left">Participante</th>
                 <th
                   className="px-5 py-2 text-right"
-                  title="Puntos de las predicciones por partido"
+                  title="Total = General + Por partido. Define el puesto en el ranking."
                 >
-                  Puntos
+                  Total
                 </th>
                 <th
                   className="px-3 py-2 text-right"
                   title="Puntos de la predicción general (bracket). El detalle se ve en cada perfil."
                 >
                   General
+                </th>
+                <th
+                  className="px-3 py-2 text-right"
+                  title="Puntos de las predicciones por partido"
+                >
+                  Por partido
                 </th>
                 <th
                   className="px-3 py-2 text-right"
@@ -560,12 +595,15 @@ export default async function ResumenPage() {
                     )}
                   </td>
                   <td className="px-5 py-2 text-right font-mono font-semibold">
-                    {p.total.toString().replace(/\.0$/, "")}
+                    {p.grandTotal.toString().replace(/\.0$/, "")}
                   </td>
                   <td className="px-3 py-2 text-right font-mono text-zinc-500">
                     {p.bracketTotal > 0
                       ? p.bracketTotal.toString().replace(/\.0$/, "")
                       : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-zinc-500">
+                    {p.total.toString().replace(/\.0$/, "")}
                   </td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
                     <PositionDelta
@@ -580,7 +618,7 @@ export default async function ResumenPage() {
                     <PointsDelta
                       deltaPts={
                         prevPtsById.has(p.id)
-                          ? p.total - prevPtsById.get(p.id)!
+                          ? p.grandTotal - prevPtsById.get(p.id)!
                           : null
                       }
                     />
@@ -817,7 +855,7 @@ export default async function ResumenPage() {
               <BracketScoreBreakdown
                 score={myBracketScore}
                 title="Puntos de tu predicción general"
-                hint="Suma a medida que el admin carga el resultado real del torneo. No está incluido en la columna 'Puntos' del ranking."
+                hint="Suma a medida que el admin carga el resultado real del torneo. Es la columna 'General' del ranking; toca cada línea para ver qué equipos te dan los puntos."
               />
             )}
             <div>

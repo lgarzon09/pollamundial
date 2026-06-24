@@ -3,14 +3,18 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type {
   BracketPrediction,
+  BracketResults,
   Match,
   MatchPrediction,
   MatchResult,
   Settings,
   Team,
+  TournamentResults,
 } from "@/lib/db/types";
 import { PredictionsByDay } from "@/components/PredictionsByDay";
 import { KORoundBlock } from "@/components/KORoundBlock";
+import { BracketScoreBreakdown } from "@/components/BracketScoreBreakdown";
+import { scoreBracket } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +36,8 @@ export default async function ParticipanteDetalle({
     { data: teams },
     { data: settings },
     { data: bracket },
+    { data: official },
+    { data: tournament },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -48,6 +54,8 @@ export default async function ParticipanteDetalle({
       .select("*")
       .eq("user_id", id)
       .maybeSingle(),
+    supabase.from("bracket_results").select("*").eq("id", 1).maybeSingle(),
+    supabase.from("tournament_results").select("*").eq("id", 1).maybeSingle(),
   ]);
 
   if (!profile) notFound();
@@ -62,6 +70,28 @@ export default async function ParticipanteDetalle({
     : false;
   const br = (bracket as BracketPrediction | null) ?? null;
   const matchList = (matches ?? []) as Match[];
+
+  // Desglose de puntos de la predicción general (sólo si el admin ya cargó
+  // algo del resultado oficial / premios). Mismo cálculo que en "mi resumen".
+  const officialBracket = (official as BracketResults | null) ?? null;
+  const tournamentResults = (tournament as TournamentResults | null) ?? null;
+  const officialDataReady =
+    (!!officialBracket &&
+      (Object.keys(officialBracket.group_positions ?? {}).length > 0 ||
+        !!officialBracket.champion ||
+        Object.keys(officialBracket.r32_winners ?? {}).length > 0)) ||
+    (!!tournamentResults &&
+      !!(
+        tournamentResults.top_scorer ||
+        tournamentResults.golden_ball ||
+        tournamentResults.golden_glove ||
+        tournamentResults.young_player ||
+        tournamentResults.revelation_team
+      ));
+  const bracketScore =
+    br && officialDataReady
+      ? scoreBracket(br, officialBracket, tournamentResults, teamsById)
+      : null;
 
   return (
     <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-5">
@@ -130,6 +160,13 @@ export default async function ParticipanteDetalle({
           </p>
         ) : (
           <div className="p-5 space-y-5 text-sm border-t border-zinc-100 dark:border-zinc-800">
+            {bracketScore && (
+              <BracketScoreBreakdown
+                score={bracketScore}
+                title={`Puntos de la predicción general de ${profile.display_name}`}
+                hint="Toca cada línea para ver qué equipos suman los puntos."
+              />
+            )}
             <div>
               <p className="text-xs uppercase tracking-wider text-zinc-500 font-semibold mb-2">
                 Posiciones de grupos

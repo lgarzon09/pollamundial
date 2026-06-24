@@ -26,11 +26,19 @@ export function maxPointsPerMatch(stage: MatchStage): number {
   return 3 * multByStage[stage] + 2 + 1 + 1 + 1 + 1 + (isKO ? 2 : 0);
 }
 
+/** Sub-detalle de una línea: de dónde sale cada porción de puntos (p. ej. cada equipo). */
+export type ScoreSubItem = {
+  label: string;
+  points: number;
+};
+
 export type ScoreLine = {
   label: string;
   points: number;
   correct: boolean;
   detail?: string;
+  /** Desglose por equipo/posición que sumó esta línea (para mostrar expandible). */
+  items?: ScoreSubItem[];
 };
 
 export type MatchScore = {
@@ -205,17 +213,17 @@ function r32TeamSet(b: BracketShape): Set<string> {
   return s;
 }
 
-/** Cantidad de equipos en común entre `a` (predicho) y `b` (real), sin contar duplicados. */
-function intersectCount(a: Iterable<string>, b: Set<string>): number {
-  let n = 0;
+/** Equipos en común entre `a` (predicho) y `b` (real), sin duplicados, en orden de `a`. */
+function intersectList(a: Iterable<string>, b: Set<string>): string[] {
+  const out: string[] = [];
   const seen = new Set<string>();
   for (const x of a) {
     if (x && b.has(x) && !seen.has(x)) {
-      n++;
+      out.push(x);
       seen.add(x);
     }
   }
-  return n;
+  return out;
 }
 
 /** Finalistas de un bracket: `finalists` si existe, si no los valores de `sf_winners`. */
@@ -236,19 +244,34 @@ export function scoreBracket(
   user: BracketShape | null,
   official: BracketShape | null,
   tournament: TournamentResults | null,
+  teamsById?: Map<string, { name: string; flag_emoji: string | null }>,
 ): MatchScore {
   const lines: ScoreLine[] = [];
   if (!user) return { total: 0, lines };
 
   const off = official ?? {};
 
+  // Etiqueta legible de un equipo (bandera + nombre); cae al id si no hay catálogo.
+  const teamName = (id: string | null | undefined): string => {
+    if (!id) return "?";
+    const t = teamsById?.get(id);
+    return t ? `${t.flag_emoji ?? ""} ${t.name}`.trim() : id;
+  };
+
   // 1. Posiciones exactas de grupo (3 c/u)
   let groupHits = 0;
+  const groupItems: ScoreSubItem[] = [];
   for (const g of BRACKET_GROUPS) {
     const up = user.group_positions?.[g] ?? [];
     const op = off.group_positions?.[g] ?? [];
     for (let i = 0; i < 4; i++) {
-      if (up[i] && op[i] && up[i] === op[i]) groupHits++;
+      if (up[i] && op[i] && up[i] === op[i]) {
+        groupHits++;
+        groupItems.push({
+          label: `Grupo ${g} · ${i + 1}° ${teamName(up[i])}`,
+          points: 3,
+        });
+      }
     }
   }
   lines.push({
@@ -256,6 +279,7 @@ export function scoreBracket(
     points: groupHits * 3,
     correct: groupHits > 0,
     detail: `${groupHits} acierto${groupHits === 1 ? "" : "s"} × 3`,
+    items: groupItems.length > 0 ? groupItems : undefined,
   });
 
   // 2. Clasifican a cada ronda (intersección de equipos)
@@ -292,12 +316,17 @@ export function scoreBracket(
     },
   ];
   for (const r of reaches) {
-    const hits = intersectCount(r.pred, r.real);
+    const hitTeams = intersectList(r.pred, r.real);
+    const hits = hitTeams.length;
     lines.push({
       label: r.label,
       points: hits * r.pts,
       correct: hits > 0,
       detail: `${hits} equipo${hits === 1 ? "" : "s"} × ${r.pts}`,
+      items:
+        hits > 0
+          ? hitTeams.map((id) => ({ label: teamName(id), points: r.pts }))
+          : undefined,
     });
   }
 
