@@ -170,7 +170,7 @@ export function scoreMatch(
 // y los premios oficiales (tournament_results).
 // Reglas (ver RulesExplained.tsx):
 //   Posición exacta en grupo:      3 pts × equipo
-//   Clasifica a Ronda de 32:       5 pts × equipo
+//   Clasifica a 16vos:             5 pts × equipo
 //   Clasifica a octavos (R16):     8 pts × equipo
 //   Clasifica a cuartos (QF):     12 pts × equipo
 //   Clasifica a semifinales (SF): 15 pts × equipo
@@ -199,7 +199,7 @@ export type BracketShape = {
   revelation_team?: string | null;
 };
 
-/** Equipos que un bracket "manda" a Ronda de 32: 1° y 2° de cada grupo + los 3° asignados. */
+/** Equipos que un bracket "manda" a 16vos: 1° y 2° de cada grupo + los 3° asignados. */
 function r32TeamSet(b: BracketShape): Set<string> {
   const s = new Set<string>();
   for (const g of BRACKET_GROUPS) {
@@ -285,7 +285,7 @@ export function scoreBracket(
   // 2. Clasifican a cada ronda (intersección de equipos)
   const reaches: { label: string; pts: number; pred: Set<string>; real: Set<string> }[] = [
     {
-      label: "Clasifican a Ronda de 32",
+      label: "Clasifican a 16vos",
       pts: 5,
       pred: r32TeamSet(user),
       real: r32TeamSet(off),
@@ -416,7 +416,7 @@ export function bracketPickPoints(
         if (op[i] && t === op[i])
           reasons.push({ label: "Posición exacta en el grupo", points: 3 });
         if (userR32.has(t) && offR32.has(t))
-          reasons.push({ label: "Clasificó a la Ronda de 32", points: 5 });
+          reasons.push({ label: "Clasificó a 16vos", points: 5 });
       }
       return pickFromReasons(reasons);
     });

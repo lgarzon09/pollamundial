@@ -182,7 +182,7 @@ export function RulesExplained() {
               label="Posición exacta en grupo (1°, 2°, 3°, 4°)"
               pts="3 pts × equipo"
             />
-            <BracketPointRow label="Clasifica a Ronda de 32" pts="5 pts × equipo" />
+            <BracketPointRow label="Clasifica a 16vos" pts="5 pts × equipo" />
             <BracketPointRow label="Clasifica a octavos" pts="8 pts × equipo" />
             <BracketPointRow label="Clasifica a cuartos" pts="12 pts × equipo" />
             <BracketPointRow label="Clasifica a semifinales" pts="15 pts × equipo" />
@@ -196,7 +196,7 @@ export function RulesExplained() {
               ⚠️ Lo más importante de entender
             </h3>
             <p className="text-sm text-amber-900 dark:text-amber-100">
-              Los puntos de avance (Ronda de 32, octavos, cuartos, semis,
+              Los puntos de avance (16vos, octavos, cuartos, semis,
               finalista) se cuentan <strong>por equipo, no por la llave
               exacta</strong>. No importa contra quién juega el equipo ni en qué
               posición quedó: solo importa si el equipo que pusiste{" "}

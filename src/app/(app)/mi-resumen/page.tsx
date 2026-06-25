@@ -991,7 +991,7 @@ export default async function ResumenPage() {
             </div>
 
             <KORoundBlock
-              title="Ronda de 32 (16vos)"
+              title="16vos"
               matches={matchList.filter((m) => m.stage === "r32")}
               winners={br.r32_winners ?? {}}
               teamsById={teamsById}

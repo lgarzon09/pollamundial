@@ -296,14 +296,14 @@ export function BracketForm({
 
       {/* R32 */}
       <section className="space-y-3">
-        <h2 className="text-xl font-bold">2. Ronda de 32 (16vos)</h2>
+        <h2 className="text-xl font-bold">2. 16vos</h2>
         <details
           open
           className="rounded-xl border border-sky-200 dark:border-sky-900 bg-sky-50 dark:bg-sky-950/50 text-sm text-sky-900 dark:text-sky-100"
         >
           <summary className="px-4 py-3 cursor-pointer font-semibold flex items-center gap-2">
             <span aria-hidden>ℹ️</span>
-            ¿Cómo funciona la ronda de 32? (léelo, te va a ahorrar dudas)
+            ¿Cómo funcionan los 16vos? (léelo, te va a ahorrar dudas)
           </summary>
           <div className="px-4 pb-4 space-y-3">
             <div>

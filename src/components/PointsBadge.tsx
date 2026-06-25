@@ -1,7 +1,7 @@
 /**
  * Muestra los puntos que aporta una selección del bracket: una píldora "+N" con
  * el total y, al lado, la(s) razón(es) detalladas (p. ej. "Posición exacta +3 ·
- * Clasificó a la Ronda de 32 +5"). No renderiza nada si la selección no suma.
+ * Clasificó a 16vos +5"). No renderiza nada si la selección no suma.
  */
 import type { PickPoints } from "@/lib/scoring";
 

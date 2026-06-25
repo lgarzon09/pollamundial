@@ -137,7 +137,7 @@ export type Settings = {
 // Helpers
 export const STAGE_LABEL: Record<MatchStage, string> = {
   group: "Fase de grupos",
-  r32: "Ronda de 32",
+  r32: "16vos de final",
   r16: "Octavos de final",
   qf: "Cuartos de final",
   sf: "Semifinales",
@@ -147,7 +147,7 @@ export const STAGE_LABEL: Record<MatchStage, string> = {
 
 export const STAGE_SHORT: Record<MatchStage, string> = {
   group: "Grupos",
-  r32: "R32",
+  r32: "16vos",
   r16: "8vos",
   qf: "4tos",
   sf: "Semis",
