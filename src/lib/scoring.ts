@@ -360,20 +360,27 @@ export function scoreBracket(
 
 /**
  * Puntos atribuibles a CADA selección individual del bracket, para mostrarlos
- * al lado de cada pick en la visualización de la predicción general.
- * Usa exactamente las mismas reglas que scoreBracket().
+ * al lado de cada pick con su razón detallada. Mismas reglas que scoreBracket().
  */
+export type PickReason = { label: string; points: number };
+export type PickPoints = { total: number; reasons: PickReason[] };
+
+const pickFromReasons = (reasons: PickReason[]): PickPoints => ({
+  total: reasons.reduce((s, r) => s + r.points, 0),
+  reasons,
+});
+
 export type BracketPickPoints = {
-  /** Por grupo, puntos de cada slot 0..3 (posición exacta +3, +5 si clasifica a R32). */
-  groupPositions: Record<string, number[]>;
+  /** Por grupo, los puntos+razones de cada slot 0..3. */
+  groupPositions: Record<string, PickPoints[]>;
   /** Por match_id (string) del pick KO: r32/r16/qf/sf winners. */
-  koWinners: Record<string, number>;
-  champion: number;
-  revelationTeam: number;
-  topScorer: number;
-  goldenBall: number;
-  goldenGlove: number;
-  youngPlayer: number;
+  koWinners: Record<string, PickPoints>;
+  champion: PickPoints;
+  revelationTeam: PickPoints;
+  topScorer: PickPoints;
+  goldenBall: PickPoints;
+  goldenGlove: PickPoints;
+  youngPlayer: PickPoints;
 };
 
 export function bracketPickPoints(
@@ -381,15 +388,16 @@ export function bracketPickPoints(
   official: BracketShape | null,
   tournament: TournamentResults | null,
 ): BracketPickPoints {
+  const none = pickFromReasons([]);
   const empty: BracketPickPoints = {
     groupPositions: {},
     koWinners: {},
-    champion: 0,
-    revelationTeam: 0,
-    topScorer: 0,
-    goldenBall: 0,
-    goldenGlove: 0,
-    youngPlayer: 0,
+    champion: none,
+    revelationTeam: none,
+    topScorer: none,
+    goldenBall: none,
+    goldenGlove: none,
+    youngPlayer: none,
   };
   if (!user) return empty;
   const off = official ?? {};
@@ -397,63 +405,95 @@ export function bracketPickPoints(
   const userR32 = r32TeamSet(user);
   const offR32 = r32TeamSet(off);
 
-  const groupPositions: Record<string, number[]> = {};
+  const groupPositions: Record<string, PickPoints[]> = {};
   for (const g of BRACKET_GROUPS) {
     const up = user.group_positions?.[g] ?? [];
     const op = off.group_positions?.[g] ?? [];
-    const arr = [0, 0, 0, 0];
-    for (let i = 0; i < 4; i++) {
+    groupPositions[g] = [0, 1, 2, 3].map((i) => {
       const t = up[i];
-      if (!t) continue;
-      let pts = 0;
-      if (op[i] && t === op[i]) pts += 3; // posición exacta
-      if (userR32.has(t) && offR32.has(t)) pts += 5; // clasifica a R32
-      arr[i] = pts;
-    }
-    groupPositions[g] = arr;
+      const reasons: PickReason[] = [];
+      if (t) {
+        if (op[i] && t === op[i])
+          reasons.push({ label: "Posición exacta en el grupo", points: 3 });
+        if (userR32.has(t) && offR32.has(t))
+          reasons.push({ label: "Clasificó a la Ronda de 32", points: 5 });
+      }
+      return pickFromReasons(reasons);
+    });
   }
 
-  const koWinners: Record<string, number> = {};
+  const koWinners: Record<string, PickPoints> = {};
   const rounds: {
     winners?: Record<string, string> | null;
     real: Set<string>;
     pts: number;
+    label: string;
   }[] = [
     {
       winners: user.r32_winners,
       real: new Set(Object.values(off.r32_winners ?? {}).filter(Boolean)),
       pts: 8,
+      label: "Clasificó a octavos",
     },
     {
       winners: user.r16_winners,
       real: new Set(Object.values(off.r16_winners ?? {}).filter(Boolean)),
       pts: 12,
+      label: "Clasificó a cuartos",
     },
     {
       winners: user.qf_winners,
       real: new Set(Object.values(off.qf_winners ?? {}).filter(Boolean)),
       pts: 15,
+      label: "Clasificó a semifinales",
     },
-    { winners: user.sf_winners, real: finalistSet(off), pts: 20 },
+    {
+      winners: user.sf_winners,
+      real: finalistSet(off),
+      pts: 20,
+      label: "Llegó a la final",
+    },
   ];
   for (const r of rounds) {
     for (const [mid, t] of Object.entries(r.winners ?? {})) {
-      if (t && r.real.has(t)) koWinners[mid] = r.pts;
+      if (t && r.real.has(t))
+        koWinners[mid] = pickFromReasons([{ label: r.label, points: r.pts }]);
     }
   }
+
+  const championOk = !!user.champion && user.champion === off.champion;
+  const revelationOk =
+    !!user.revelation_team && user.revelation_team === tournament?.revelation_team;
 
   return {
     groupPositions,
     koWinners,
-    champion: !!user.champion && user.champion === off.champion ? 30 : 0,
-    revelationTeam:
-      !!user.revelation_team && user.revelation_team === tournament?.revelation_team
-        ? 15
-        : 0,
-    topScorer: sameText(user.top_scorer, tournament?.top_scorer) ? 25 : 0,
-    goldenBall: sameText(user.golden_ball, tournament?.golden_ball) ? 15 : 0,
-    goldenGlove: sameText(user.golden_glove, tournament?.golden_glove) ? 15 : 0,
-    youngPlayer: sameText(user.young_player, tournament?.young_player) ? 15 : 0,
+    champion: pickFromReasons(
+      championOk ? [{ label: "Acertaste al campeón", points: 30 }] : [],
+    ),
+    revelationTeam: pickFromReasons(
+      revelationOk ? [{ label: "Acertaste el equipo revelación", points: 15 }] : [],
+    ),
+    topScorer: pickFromReasons(
+      sameText(user.top_scorer, tournament?.top_scorer)
+        ? [{ label: "Acertaste el goleador", points: 25 }]
+        : [],
+    ),
+    goldenBall: pickFromReasons(
+      sameText(user.golden_ball, tournament?.golden_ball)
+        ? [{ label: "Acertaste el Balón de Oro", points: 15 }]
+        : [],
+    ),
+    goldenGlove: pickFromReasons(
+      sameText(user.golden_glove, tournament?.golden_glove)
+        ? [{ label: "Acertaste el Guante de Oro", points: 15 }]
+        : [],
+    ),
+    youngPlayer: pickFromReasons(
+      sameText(user.young_player, tournament?.young_player)
+        ? [{ label: "Acertaste el mejor jugador joven", points: 15 }]
+        : [],
+    ),
   };
 }
 

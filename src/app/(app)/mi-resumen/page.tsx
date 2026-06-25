@@ -23,7 +23,9 @@ import {
   scoreBracket,
   scoreMatch,
   totalMatchPoints,
+  type PickPoints,
 } from "@/lib/scoring";
+import { makeSlotResolver } from "@/lib/bracket";
 import { fetchAllRows } from "@/lib/db/fetchAll";
 
 export const dynamic = "force-dynamic";
@@ -136,58 +138,92 @@ export default async function ResumenPage() {
         a.display_name.localeCompare(b.display_name),
     );
 
-  // Movimiento desde la "última jornada": comparamos el ranking actual contra
-  // cómo estaba ANTES del último lote de resultados finalizados (mismo día de
-  // finalized_at, en TZ Bogotá). Si no hay una jornada previa, no mostramos
-  // flechas (sería la primera).
+  // Movimiento desde la "última jornada". Una jornada es el día (TZ Bogotá) del
+  // evento más reciente que cambió puntajes: el último lote de partidos
+  // finalizados O la última carga de resultados oficiales (predicción general).
+  // El Δ y el cambio de puesto se calculan SIEMPRE sobre el TOTAL (general + por
+  // partido) comparando contra el estado de antes de ese día.
   const BOGOTA_DAY = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Bogota",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
+
+  // ¿El admin ya cargó resultados oficiales de la predicción general?
+  const officialDataReady =
+    (!!officialBracket &&
+      (Object.keys(officialBracket.group_positions ?? {}).length > 0 ||
+        !!officialBracket.champion ||
+        Object.keys(officialBracket.r32_winners ?? {}).length > 0)) ||
+    (!!tournamentResults &&
+      !!(
+        tournamentResults.top_scorer ||
+        tournamentResults.golden_ball ||
+        tournamentResults.golden_glove ||
+        tournamentResults.young_player ||
+        tournamentResults.revelation_team
+      ));
+
   const finalizedResults = (results ?? []).filter(
     (r) => r.is_finalized && r.finalized_at,
   ) as MatchResult[];
-  const finalizedDays = finalizedResults.map((r) =>
-    BOGOTA_DAY.format(new Date(r.finalized_at as string)),
-  );
-  const lastJornadaDay =
-    finalizedDays.length > 0 ? [...finalizedDays].sort().at(-1)! : null;
-  const lastJornadaMatchIds = new Set(
-    finalizedResults
-      .filter(
-        (r) =>
-          BOGOTA_DAY.format(new Date(r.finalized_at as string)) ===
-          lastJornadaDay,
-      )
-      .map((r) => r.match_id),
-  );
-  // Solo hay "anterior" si quedan resultados finalizados fuera del último lote.
+  const matchDayOf = (r: MatchResult) =>
+    BOGOTA_DAY.format(new Date(r.finalized_at as string));
+  const lastMatchDay =
+    finalizedResults.length > 0
+      ? [...finalizedResults.map(matchDayOf)].sort().at(-1)!
+      : null;
+
+  // Día de la última carga de resultados oficiales (sólo si ya hay datos).
+  const officialUpdateDay = officialDataReady
+    ? ([officialBracket?.updated_at, tournamentResults?.updated_at]
+        .filter(Boolean)
+        .map((d) => BOGOTA_DAY.format(new Date(d as string)))
+        .sort()
+        .at(-1) ?? null)
+    : null;
+
+  // Día del evento más reciente (los strings YYYY-MM-DD ordenan cronológicamente).
+  const lastEventDay =
+    [lastMatchDay, officialUpdateDay].filter(Boolean).sort().at(-1) ?? null;
+
+  // ¿El general ya estaba contado ANTES de esta jornada? (se cargó un día previo).
+  // Si no, antes valía 0 y su salto se refleja en el Δ de esta jornada.
+  const generalCountedBefore =
+    officialUpdateDay != null &&
+    lastEventDay != null &&
+    officialUpdateDay < lastEventDay;
+
+  // Resultados de partidos de jornadas anteriores (día < lastEventDay).
+  const resultsAnteriores = new Map<number, MatchResult>();
+  for (const r of finalizedResults) {
+    if (lastEventDay != null && matchDayOf(r) < lastEventDay)
+      resultsAnteriores.set(r.match_id, r);
+  }
+
+  // Hay "anterior" si antes de lastEventDay ya había puntos (partidos o general).
   const hasPreviousJornada =
-    lastJornadaDay != null &&
-    finalizedResults.length > lastJornadaMatchIds.size;
+    lastEventDay != null &&
+    (resultsAnteriores.size > 0 || generalCountedBefore);
 
   const prevPosById = new Map<string, number>();
   const prevPtsById = new Map<string, number>();
   if (hasPreviousJornada) {
-    const resultsAnteriores = new Map<number, MatchResult>();
-    for (const [mid, r] of resultsByMatch) {
-      if (!lastJornadaMatchIds.has(mid)) resultsAnteriores.set(mid, r);
-    }
     const prevRanked = (profiles ?? [])
       .map((p) => {
         const userPreds =
           predsByUser.get(p.id) ?? new Map<number, MatchPrediction>();
         const t = totalMatchPoints(matchList, userPreds, resultsAnteriores);
-        // La predicción general no cambia entre jornadas, así que el "total"
-        // anterior es el de por partido (de antes) + el general (actual).
-        const bracketTotal = scoreBracket(
-          bracketsByUser.get(p.id) ?? null,
-          officialBracket,
-          tournamentResults,
-          teamsById,
-        ).total;
+        // El general anterior sólo cuenta si se había cargado en una jornada previa.
+        const bracketTotal = generalCountedBefore
+          ? scoreBracket(
+              bracketsByUser.get(p.id) ?? null,
+              officialBracket,
+              tournamentResults,
+              teamsById,
+            ).total
+          : 0;
         return {
           id: p.id,
           display_name: p.display_name,
@@ -234,20 +270,6 @@ export default async function ResumenPage() {
   const myBracketTotal = myEntry?.bracketTotal ?? 0;
   const br = (bracket as BracketPrediction | null) ?? null;
 
-  // ¿El admin ya cargó algo del resultado oficial / premios?
-  const officialDataReady =
-    (!!officialBracket &&
-      (Object.keys(officialBracket.group_positions ?? {}).length > 0 ||
-        !!officialBracket.champion ||
-        Object.keys(officialBracket.r32_winners ?? {}).length > 0)) ||
-    (!!tournamentResults &&
-      !!(
-        tournamentResults.top_scorer ||
-        tournamentResults.golden_ball ||
-        tournamentResults.golden_glove ||
-        tournamentResults.young_player ||
-        tournamentResults.revelation_team
-      ));
   const myBracketScore =
     br && officialDataReady
       ? scoreBracket(br, officialBracket, tournamentResults, teamsById)
@@ -257,6 +279,9 @@ export default async function ResumenPage() {
     br && officialDataReady
       ? bracketPickPoints(br, officialBracket, tournamentResults)
       : null;
+  // Resuelve los emparejamientos KO según el propio bracket del usuario.
+  const matchesById = new Map<number, Match>(matchList.map((m) => [m.id, m]));
+  const slotResolver = br ? makeSlotResolver(br, matchesById) : undefined;
 
   // ¿Predicción general "completa"? (12 grupos + R32 + R16 + QF + SF + campeón + 5 premios)
   const countJsonbKeys = (obj: Record<string, string> | undefined) =>
@@ -919,7 +944,7 @@ export default async function ResumenPage() {
                               {t ? (
                                 <span>
                                   {t.flag_emoji} {t.name}
-                                  <PointsBadge points={pickPts?.groupPositions[g]?.[i]} />
+                                  <PointsBadge pick={pickPts?.groupPositions[g]?.[i]} />
                                 </span>
                               ) : (
                                 <span className="text-zinc-400 italic">—</span>
@@ -940,6 +965,7 @@ export default async function ResumenPage() {
               winners={br.r32_winners ?? {}}
               teamsById={teamsById}
               points={pickPts?.koWinners}
+              resolve={slotResolver}
             />
             <KORoundBlock
               title="Octavos de final"
@@ -947,6 +973,7 @@ export default async function ResumenPage() {
               winners={br.r16_winners ?? {}}
               teamsById={teamsById}
               points={pickPts?.koWinners}
+              resolve={slotResolver}
             />
             <KORoundBlock
               title="Cuartos de final"
@@ -954,6 +981,7 @@ export default async function ResumenPage() {
               winners={br.qf_winners ?? {}}
               teamsById={teamsById}
               points={pickPts?.koWinners}
+              resolve={slotResolver}
             />
             <KORoundBlock
               title="Semifinales"
@@ -961,6 +989,7 @@ export default async function ResumenPage() {
               winners={br.sf_winners ?? {}}
               teamsById={teamsById}
               points={pickPts?.koWinners}
+              resolve={slotResolver}
             />
 
             <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
@@ -1063,7 +1092,7 @@ function BracketRow({
   label: string;
   team: Team | null | undefined;
   points: string;
-  earned?: number;
+  earned?: PickPoints;
 }) {
   return (
     <div className="flex items-center justify-between border-b border-dotted border-zinc-200 dark:border-zinc-800 pb-1.5">
@@ -1072,7 +1101,7 @@ function BracketRow({
         {team ? (
           <>
             {team.flag_emoji} <strong>{team.name}</strong>
-            <PointsBadge points={earned} />
+            <PointsBadge pick={earned} />
           </>
         ) : (
           <span className="text-zinc-400 italic">— ({points})</span>
@@ -1091,7 +1120,7 @@ function BracketText({
   label: string;
   value: string | null;
   points: string;
-  earned?: number;
+  earned?: PickPoints;
 }) {
   return (
     <div className="flex items-center justify-between border-b border-dotted border-zinc-200 dark:border-zinc-800 pb-1.5">
@@ -1100,7 +1129,7 @@ function BracketText({
         {value ? (
           <>
             <strong>{value}</strong>
-            <PointsBadge points={earned} />
+            <PointsBadge pick={earned} />
           </>
         ) : (
           <span className="text-zinc-400 italic">— ({points})</span>

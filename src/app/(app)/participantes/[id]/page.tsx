@@ -15,7 +15,8 @@ import { PredictionsByDay } from "@/components/PredictionsByDay";
 import { KORoundBlock } from "@/components/KORoundBlock";
 import { BracketScoreBreakdown } from "@/components/BracketScoreBreakdown";
 import { PointsBadge } from "@/components/PointsBadge";
-import { bracketPickPoints, scoreBracket } from "@/lib/scoring";
+import { bracketPickPoints, scoreBracket, type PickPoints } from "@/lib/scoring";
+import { makeSlotResolver } from "@/lib/bracket";
 
 export const dynamic = "force-dynamic";
 
@@ -97,6 +98,8 @@ export default async function ParticipanteDetalle({
     br && officialDataReady
       ? bracketPickPoints(br, officialBracket, tournamentResults)
       : null;
+  const matchesById = new Map<number, Match>(matchList.map((m) => [m.id, m]));
+  const slotResolver = br ? makeSlotResolver(br, matchesById) : undefined;
 
   return (
     <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-5">
@@ -194,7 +197,7 @@ export default async function ParticipanteDetalle({
                               {t ? (
                                 <span>
                                   {t.flag_emoji} {t.name}
-                                  <PointsBadge points={pickPts?.groupPositions[g]?.[i]} />
+                                  <PointsBadge pick={pickPts?.groupPositions[g]?.[i]} />
                                 </span>
                               ) : (
                                 <span className="text-zinc-400 italic">—</span>
@@ -215,6 +218,7 @@ export default async function ParticipanteDetalle({
               winners={br.r32_winners ?? {}}
               teamsById={teamsById}
               points={pickPts?.koWinners}
+              resolve={slotResolver}
             />
             <KORoundBlock
               title="Octavos de final"
@@ -222,6 +226,7 @@ export default async function ParticipanteDetalle({
               winners={br.r16_winners ?? {}}
               teamsById={teamsById}
               points={pickPts?.koWinners}
+              resolve={slotResolver}
             />
             <KORoundBlock
               title="Cuartos de final"
@@ -229,6 +234,7 @@ export default async function ParticipanteDetalle({
               winners={br.qf_winners ?? {}}
               teamsById={teamsById}
               points={pickPts?.koWinners}
+              resolve={slotResolver}
             />
             <KORoundBlock
               title="Semifinales"
@@ -236,6 +242,7 @@ export default async function ParticipanteDetalle({
               winners={br.sf_winners ?? {}}
               teamsById={teamsById}
               points={pickPts?.koWinners}
+              resolve={slotResolver}
             />
 
             <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
@@ -276,7 +283,7 @@ function BracketLine({
 }: {
   label: string;
   value: string | null;
-  earned?: number;
+  earned?: PickPoints;
 }) {
   return (
     <div className="flex items-center justify-between border-b border-dotted border-zinc-200 dark:border-zinc-800 pb-1.5">
@@ -285,7 +292,7 @@ function BracketLine({
         {value ? (
           <>
             {value}
-            <PointsBadge points={earned} />
+            <PointsBadge pick={earned} />
           </>
         ) : (
           <span className="text-zinc-400 italic">—</span>
