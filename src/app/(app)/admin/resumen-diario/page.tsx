@@ -215,14 +215,12 @@ export default async function ResumenDiarioPage() {
   lines.push("");
   lines.push("📊 Tabla (P = por partido · G = general):");
   ranked.forEach((p, i) => {
-    // Detalle de lo ganado ayer, diferenciando partido y general.
-    let gainTxt = "";
-    if (p.gain > 0) {
-      const parts: string[] = [];
-      if (p.matchGain > 0) parts.push(`+${fmt(p.matchGain)} part`);
-      if (p.generalGain > 0) parts.push(`+${fmt(p.generalGain)} gral`);
-      gainTxt = `  ▲ ${parts.join(" · ")} ayer`;
-    }
+    // Lo ganado ayer, mostrando SIEMPRE las dos dimensiones (partido y general)
+    // cuando hubo algún movimiento, así sea +0 en una de ellas.
+    const gainTxt =
+      p.gain > 0
+        ? `  ▲ ayer P +${fmt(p.matchGain)} · G +${fmt(p.generalGain)}`
+        : "";
     lines.push(
       `${medal(i)} ${p.name} — ${fmt(p.total)} (P ${fmt(p.matchTotal)} · G ${fmt(
         p.generalTotal,
@@ -231,7 +229,7 @@ export default async function ResumenDiarioPage() {
   });
   lines.push("");
   lines.push("P = puntos por partidos · G = puntos de la predicción general.");
-  lines.push("▲ es lo que sumó ayer. ¡A seguir! 🔥");
+  lines.push("▲ ayer = lo que sumó ayer en cada uno. ¡A seguir! 🔥");
   const text = lines.join("\n");
   const subject = `Polla Mundial — Resultados de ayer (${dateLabel})`;
 
@@ -273,7 +271,18 @@ export default async function ResumenDiarioPage() {
                   General
                 </th>
                 <th className="px-4 py-2 text-right">Total</th>
-                <th className="px-4 py-2 text-right">Ayer</th>
+                <th
+                  className="px-3 py-2 text-right"
+                  title="Puntos por partido ganados ayer"
+                >
+                  +P ayer
+                </th>
+                <th
+                  className="px-3 py-2 text-right"
+                  title="Puntos generales ganados ayer"
+                >
+                  +G ayer
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -293,15 +302,19 @@ export default async function ResumenDiarioPage() {
                   <td className="px-4 py-2 text-right font-mono font-semibold">
                     {fmt(p.total)}
                   </td>
-                  <td className="px-4 py-2 text-right font-mono whitespace-nowrap">
-                    {p.gain > 0 ? (
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap">
+                    {p.matchGain > 0 ? (
                       <span className="text-emerald-600 dark:text-emerald-400">
-                        +{fmt(p.gain)}
-                        {p.generalGain > 0 && p.matchGain > 0 && (
-                          <span className="text-[10px] text-zinc-400 ml-1">
-                            ({fmt(p.matchGain)}P/{fmt(p.generalGain)}G)
-                          </span>
-                        )}
+                        +{fmt(p.matchGain)}
+                      </span>
+                    ) : (
+                      <span className="text-zinc-300 dark:text-zinc-700">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap">
+                    {p.generalGain > 0 ? (
+                      <span className="text-emerald-600 dark:text-emerald-400">
+                        +{fmt(p.generalGain)}
                       </span>
                     ) : (
                       <span className="text-zinc-300 dark:text-zinc-700">—</span>
