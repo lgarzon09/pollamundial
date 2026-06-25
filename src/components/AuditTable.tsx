@@ -64,10 +64,10 @@ export function AuditTable({
         <table className="text-sm border-collapse">
           <thead>
             <tr className="bg-zinc-50 dark:bg-zinc-950">
-              <th className="sticky left-0 top-0 z-30 bg-zinc-50 dark:bg-zinc-950 text-left px-3 py-2 w-44 min-w-44 border-b border-r border-zinc-200 dark:border-zinc-800">
+              <th className="sticky left-0 top-0 z-30 bg-zinc-50 dark:bg-zinc-950 text-left px-2 sm:px-3 py-2 w-32 sm:w-44 min-w-32 sm:min-w-44 border-b border-r border-zinc-200 dark:border-zinc-800">
                 Participante
               </th>
-              <th className="sticky left-44 top-0 z-30 bg-zinc-50 dark:bg-zinc-950 text-right px-3 py-2 w-20 min-w-20 border-b border-r border-zinc-200 dark:border-zinc-800">
+              <th className="sticky left-32 sm:left-44 top-0 z-30 bg-zinc-50 dark:bg-zinc-950 text-right px-2 sm:px-3 py-2 w-16 sm:w-20 min-w-16 sm:min-w-20 border-b border-r border-zinc-200 dark:border-zinc-800">
                 Total
                 <span className="block text-[10px] font-normal text-zinc-400">
                   por partido
@@ -108,9 +108,9 @@ export function AuditTable({
                   }
                 >
                   <td
-                    className={`sticky left-0 z-10 ${nameBg} px-3 py-1.5 w-44 min-w-44 border-b border-r border-zinc-100 dark:border-zinc-800`}
+                    className={`sticky left-0 z-10 ${nameBg} px-2 sm:px-3 py-1.5 w-32 sm:w-44 min-w-32 sm:min-w-44 border-b border-r border-zinc-100 dark:border-zinc-800`}
                   >
-                    <span className="font-medium truncate block max-w-40">
+                    <span className="font-medium truncate block max-w-28 sm:max-w-40">
                       {r.name}
                       {mine && (
                         <span className="ml-1 text-[10px] uppercase tracking-wider text-emerald-700 dark:text-emerald-400 font-semibold">
@@ -125,7 +125,7 @@ export function AuditTable({
                     </span>
                   </td>
                   <td
-                    className={`sticky left-44 z-10 ${nameBg} px-3 py-1.5 w-20 min-w-20 text-right font-mono font-semibold border-b border-r border-zinc-100 dark:border-zinc-800`}
+                    className={`sticky left-32 sm:left-44 z-10 ${nameBg} px-2 sm:px-3 py-1.5 w-16 sm:w-20 min-w-16 sm:min-w-20 text-right font-mono font-semibold border-b border-r border-zinc-100 dark:border-zinc-800`}
                   >
                     {fmt(r.total)}
                   </td>
