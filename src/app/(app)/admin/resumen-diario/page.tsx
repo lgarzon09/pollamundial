@@ -70,26 +70,53 @@ export default async function ResumenDiarioPage() {
     officialBracket,
   );
 
-  const today = BOGOTA_DAY.format(new Date());
+  // Este mensaje se envía EN LA MAÑANA y recapitula AYER. "Ayer" es el día
+  // (zona Bogotá) anterior al de hoy; los totales son los del cierre de ayer.
+  const now = new Date();
+  const yesterdayDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const today = BOGOTA_DAY.format(now);
+  const yesterday = BOGOTA_DAY.format(yesterdayDate);
   const dayOf = (iso: string | null) =>
     iso ? BOGOTA_DAY.format(new Date(iso)) : null;
 
-  // Resultados finalizados: todos (hoy) y los de días anteriores (ayer).
+  // Resultados finalizados, partidos según el día en que se cargó el resultado:
+  //  - hastaAyer  = quedaron cargados hasta el cierre de ayer (día < hoy)
+  //  - antesDeAyer = quedaron cargados antes de ayer (día < ayer)
+  // La diferencia entre ambos aísla lo que se sumó AYER.
   const finalized = (results ?? []).filter(
     (r) => r.is_finalized && r.finalized_at,
   ) as MatchResult[];
-  const resultsNow = new Map<number, MatchResult>(
-    finalized.map((r) => [r.match_id, r]),
-  );
-  const resultsBeforeToday = new Map<number, MatchResult>(
+  const resultsThroughYesterday = new Map<number, MatchResult>(
     finalized.filter((r) => dayOf(r.finalized_at)! < today).map((r) => [r.match_id, r]),
   );
+  const resultsBeforeYesterday = new Map<number, MatchResult>(
+    finalized.filter((r) => dayOf(r.finalized_at)! < yesterday).map((r) => [r.match_id, r]),
+  );
 
-  // ¿La predicción general (bracket/premios oficiales) se cargó HOY?
-  // Si fue así, ayer valía 0 y su salto cuenta como ganado hoy.
-  const bracketUpdatedToday =
-    dayOf(officialBracket?.updated_at ?? null) === today ||
-    dayOf(tournamentResults?.updated_at ?? null) === today;
+  // Para los puntos GENERALES (predicción general): sólo cuentan los resultados
+  // oficiales del torneo cargados hasta cierto día. Se filtran de forma
+  // independiente el bracket oficial y los premios (pueden cargarse en días
+  // distintos), pasando null a scoreBracket cuando aún no aplican.
+  const onOrBefore = (iso: string | null, day: string) => {
+    const d = dayOf(iso);
+    return d != null && d <= day;
+  };
+  const offThroughYesterday =
+    officialBracket && onOrBefore(officialBracket.updated_at, yesterday)
+      ? officialBracket
+      : null;
+  const tourThroughYesterday =
+    tournamentResults && onOrBefore(tournamentResults.updated_at, yesterday)
+      ? tournamentResults
+      : null;
+  const offBeforeYesterday =
+    officialBracket && dayOf(officialBracket.updated_at)! < yesterday
+      ? officialBracket
+      : null;
+  const tourBeforeYesterday =
+    tournamentResults && dayOf(tournamentResults.updated_at)! < yesterday
+      ? tournamentResults
+      : null;
 
   // Predicciones por usuario.
   const predsByUser = new Map<string, Map<number, MatchPrediction>>();
@@ -105,23 +132,47 @@ export default async function ResumenDiarioPage() {
     .map((p) => {
       const userPreds =
         predsByUser.get(p.id) ?? new Map<number, MatchPrediction>();
-      const now = totalMatchPoints(matchList, userPreds, resultsNow);
-      const yest = totalMatchPoints(matchList, userPreds, resultsBeforeToday);
-      const bracketTotal = scoreBracket(
-        bracketsByUser.get(p.id) ?? null,
-        officialBracket,
-        tournamentResults,
+      const myBracket = bracketsByUser.get(p.id) ?? null;
+
+      // Puntos por PARTIDO: total al cierre de ayer y lo ganado ayer.
+      const matchThrough = totalMatchPoints(
+        matchList,
+        userPreds,
+        resultsThroughYesterday,
+      );
+      const matchBefore = totalMatchPoints(
+        matchList,
+        userPreds,
+        resultsBeforeYesterday,
+      );
+      const matchTotal = matchThrough.total;
+      const matchGain = matchTotal - matchBefore.total;
+
+      // Puntos GENERALES (predicción general): total al cierre de ayer y ganado ayer.
+      const generalTotal = scoreBracket(
+        myBracket,
+        offThroughYesterday,
+        tourThroughYesterday,
         teamsById,
       ).total;
-      const bracketYesterday = bracketUpdatedToday ? 0 : bracketTotal;
-      const grandTotal = now.total + bracketTotal;
-      const grandYesterday = yest.total + bracketYesterday;
+      const generalBefore = scoreBracket(
+        myBracket,
+        offBeforeYesterday,
+        tourBeforeYesterday,
+        teamsById,
+      ).total;
+      const generalGain = generalTotal - generalBefore;
+
       return {
         id: p.id,
         name: p.display_name,
-        exactCount: now.exactCount,
-        total: grandTotal,
-        gainedToday: grandTotal - grandYesterday,
+        exactCount: matchThrough.exactCount,
+        matchTotal,
+        generalTotal,
+        total: matchTotal + generalTotal,
+        matchGain,
+        generalGain,
+        gain: matchGain + generalGain,
       };
     })
     .sort(
@@ -131,14 +182,14 @@ export default async function ResumenDiarioPage() {
         a.name.localeCompare(b.name),
     );
 
-  // Partidos finalizados HOY, para el bloque de resultados del mensaje.
-  const todayResults = matchList
+  // Partidos cuyo resultado quedó cargado AYER, para el bloque de resultados.
+  const yesterdayResults = matchList
     .filter((m) => {
-      const r = resultsNow.get(m.id);
-      return r && dayOf(r.finalized_at)! === today;
+      const r = resultsThroughYesterday.get(m.id);
+      return r && dayOf(r.finalized_at)! === yesterday;
     })
     .map((m) => {
-      const r = resultsNow.get(m.id)!;
+      const r = resultsThroughYesterday.get(m.id)!;
       const home = m.home_team_id ? teamsById.get(m.home_team_id) : null;
       const away = m.away_team_id ? teamsById.get(m.away_team_id) : null;
       const homeName = home?.name ?? m.home_placeholder ?? "?";
@@ -147,40 +198,53 @@ export default async function ResumenDiarioPage() {
     });
 
   // ===== Texto del mensaje (listo para reenviar) =====
-  const dateLabel = DATE_LONG.format(new Date());
+  const dateLabel = DATE_LONG.format(yesterdayDate);
   const medal = (i: number) =>
     i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
 
   const lines: string[] = [];
   lines.push("🏆 Polla Mundial 2026");
-  lines.push(`📅 Resumen del ${dateLabel}`);
+  lines.push(`📅 Resultados de ayer · ${dateLabel}`);
   lines.push("");
-  lines.push("⚽ Resultados de hoy:");
-  if (todayResults.length > 0) {
-    for (const r of todayResults) lines.push(r);
+  lines.push("⚽ Partidos de ayer:");
+  if (yesterdayResults.length > 0) {
+    for (const r of yesterdayResults) lines.push(r);
   } else {
-    lines.push("Hoy no se cargaron resultados nuevos.");
+    lines.push("Ayer no se cargaron resultados nuevos.");
   }
   lines.push("");
-  lines.push("📊 Tabla (total · lo de hoy):");
+  lines.push("📊 Tabla (P = por partido · G = general):");
   ranked.forEach((p, i) => {
-    const gain = p.gainedToday > 0 ? ` (+${fmt(p.gainedToday)} hoy)` : "";
-    lines.push(`${medal(i)} ${p.name} — ${fmt(p.total)}${gain}`);
+    // Detalle de lo ganado ayer, diferenciando partido y general.
+    let gainTxt = "";
+    if (p.gain > 0) {
+      const parts: string[] = [];
+      if (p.matchGain > 0) parts.push(`+${fmt(p.matchGain)} part`);
+      if (p.generalGain > 0) parts.push(`+${fmt(p.generalGain)} gral`);
+      gainTxt = `  ▲ ${parts.join(" · ")} ayer`;
+    }
+    lines.push(
+      `${medal(i)} ${p.name} — ${fmt(p.total)} (P ${fmt(p.matchTotal)} · G ${fmt(
+        p.generalTotal,
+      )})${gainTxt}`,
+    );
   });
   lines.push("");
-  lines.push("El número entre paréntesis es lo que sumó hoy. ¡A seguir! 🔥");
+  lines.push("P = puntos por partidos · G = puntos de la predicción general.");
+  lines.push("▲ es lo que sumó ayer. ¡A seguir! 🔥");
   const text = lines.join("\n");
-  const subject = `Polla Mundial — Resumen del ${dateLabel}`;
+  const subject = `Polla Mundial — Resultados de ayer (${dateLabel})`;
 
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
       <header className="space-y-1">
         <h1 className="text-3xl font-bold">Resumen diario</h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400 max-w-2xl">
-          Mensaje listo para reenviar con la tabla de todos y lo que cada quien
-          sumó <strong>hoy</strong> ({today}, hora de Colombia). &ldquo;Hoy&rdquo;
-          son los puntos de partidos cuyo resultado quedó cargado durante el día
-          de hoy. Ábrelo, compártelo y reenvíalo por donde quieras.
+          Mensaje para enviar <strong>en la mañana</strong>: recapitula los
+          resultados y puntos de <strong>ayer</strong> ({yesterday}, hora de
+          Colombia). Los totales son los del cierre de ayer, separados en{" "}
+          <strong>P</strong> (por partido) y <strong>G</strong> (general). Ábrelo,
+          compártelo y reenvíalo por donde quieras.
         </p>
       </header>
 
@@ -190,39 +254,64 @@ export default async function ResumenDiarioPage() {
         <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/40">
           <h2 className="font-semibold text-sm">Vista previa</h2>
         </div>
-        <table className="w-full text-sm">
-          <thead className="text-zinc-500 dark:text-zinc-400">
-            <tr>
-              <th className="px-4 py-2 text-left w-10">#</th>
-              <th className="px-4 py-2 text-left">Participante</th>
-              <th className="px-4 py-2 text-right">Total</th>
-              <th className="px-4 py-2 text-right">Hoy</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ranked.map((p, i) => (
-              <tr
-                key={p.id}
-                className="border-t border-zinc-100 dark:border-zinc-800"
-              >
-                <td className="px-4 py-2 text-zinc-500">{i + 1}</td>
-                <td className="px-4 py-2 font-medium">{p.name}</td>
-                <td className="px-4 py-2 text-right font-mono font-semibold">
-                  {fmt(p.total)}
-                </td>
-                <td className="px-4 py-2 text-right font-mono">
-                  {p.gainedToday > 0 ? (
-                    <span className="text-emerald-600 dark:text-emerald-400">
-                      +{fmt(p.gainedToday)}
-                    </span>
-                  ) : (
-                    <span className="text-zinc-300 dark:text-zinc-700">—</span>
-                  )}
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[520px]">
+            <thead className="text-zinc-500 dark:text-zinc-400">
+              <tr>
+                <th className="px-4 py-2 text-left w-10">#</th>
+                <th className="px-4 py-2 text-left">Participante</th>
+                <th
+                  className="px-3 py-2 text-right"
+                  title="Puntos por partido (al cierre de ayer)"
+                >
+                  Por partido
+                </th>
+                <th
+                  className="px-3 py-2 text-right"
+                  title="Puntos de la predicción general (al cierre de ayer)"
+                >
+                  General
+                </th>
+                <th className="px-4 py-2 text-right">Total</th>
+                <th className="px-4 py-2 text-right">Ayer</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {ranked.map((p, i) => (
+                <tr
+                  key={p.id}
+                  className="border-t border-zinc-100 dark:border-zinc-800"
+                >
+                  <td className="px-4 py-2 text-zinc-500">{i + 1}</td>
+                  <td className="px-4 py-2 font-medium">{p.name}</td>
+                  <td className="px-3 py-2 text-right font-mono text-zinc-500">
+                    {fmt(p.matchTotal)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-zinc-500">
+                    {p.generalTotal > 0 ? fmt(p.generalTotal) : "—"}
+                  </td>
+                  <td className="px-4 py-2 text-right font-mono font-semibold">
+                    {fmt(p.total)}
+                  </td>
+                  <td className="px-4 py-2 text-right font-mono whitespace-nowrap">
+                    {p.gain > 0 ? (
+                      <span className="text-emerald-600 dark:text-emerald-400">
+                        +{fmt(p.gain)}
+                        {p.generalGain > 0 && p.matchGain > 0 && (
+                          <span className="text-[10px] text-zinc-400 ml-1">
+                            ({fmt(p.matchGain)}P/{fmt(p.generalGain)}G)
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="text-zinc-300 dark:text-zinc-700">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </main>
   );
