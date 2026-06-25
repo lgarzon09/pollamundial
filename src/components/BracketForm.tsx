@@ -370,8 +370,10 @@ export function BracketForm({
                   FIFA tiene una <strong>tabla oficial de asignación</strong>{" "}
                   con varios escenarios. El escenario real se sabe solo cuando
                   terminan los grupos y se conocen cuáles 8 de los 12 terceros
-                  clasifican. Tu pick debe coincidir con esa asignación para
-                  ganar los puntos del matchup.
+                  clasifican. Esto define <strong>contra quién</strong> juega
+                  cada equipo, pero <strong>los puntos se cuentan por equipo</strong>:
+                  basta con que el equipo que pusiste llegue a esa ronda, sin
+                  importar la llave o la posición exacta.
                 </li>
                 <li>
                   <strong>No hay regla de confederaciones en KO</strong>: sí
@@ -814,9 +816,10 @@ function KOMatchRow({
                     los 12 terceros clasifiquen, a qué slot va cada uno.
                   </li>
                   <li>
-                    Tu elección aquí debe coincidir con lo que decida esa tabla
-                    para ganar los puntos del matchup. Es estrategia: predecir
-                    qué grupos producen los mejores 3° lugares.
+                    Esto define <strong>contra quién</strong> juega cada equipo.
+                    Los puntos, en cambio, se cuentan <strong>por equipo</strong>:
+                    sumas si el equipo que pusiste clasifica, sin importar el
+                    slot exacto.
                   </li>
                 </ul>
               </div>
