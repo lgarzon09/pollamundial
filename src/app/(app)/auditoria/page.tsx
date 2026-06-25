@@ -68,6 +68,8 @@ export default async function AuditoriaPage() {
     }
     return ph ?? "?";
   };
+  const teamFlag = (id: string | null): string =>
+    (id && teamsById.get(id)?.flag_emoji) || "";
   const matchCols: AuditMatch[] = matchList.map((m, i) => {
     const r = resultsByMatch.get(m.id) ?? null;
     const finalized = !!r?.is_finalized;
@@ -76,10 +78,12 @@ export default async function AuditoriaPage() {
       n: i + 1,
       stage: STAGE_SHORT[m.stage],
       finalized,
-      label: `${teamLabel(m.home_team_id, m.home_placeholder)} vs ${teamLabel(
+      label: `P${i + 1} · ${teamLabel(m.home_team_id, m.home_placeholder)} vs ${teamLabel(
         m.away_team_id,
         m.away_placeholder,
       )} · ${DAY_FMT.format(new Date(m.kickoff_at))}`,
+      homeFlag: teamFlag(m.home_team_id),
+      awayFlag: teamFlag(m.away_team_id),
       real: finalized ? `${r!.home_score_90}–${r!.away_score_90}` : null,
     };
   });

@@ -8,6 +8,8 @@ export type AuditMatch = {
   stage: string; // etiqueta corta de etapa
   finalized: boolean;
   label: string; // "🇲🇽 México vs 🇿🇦 Sudáfrica · 11 jun" (para el tooltip)
+  homeFlag: string; // bandera del equipo local ("" si aún no se define)
+  awayFlag: string; // bandera del equipo visitante ("" si aún no se define)
   real: string | null; // marcador real "2–1" si está finalizado
 };
 
@@ -76,15 +78,20 @@ export function AuditTable({
               {matches.map((m) => (
                 <th
                   key={m.id}
-                  title={`P${m.n} · ${m.label}${m.finalized ? "" : " · sin resultado"}`}
+                  title={`${m.label}${m.finalized ? "" : " · sin resultado"}`}
                   className={`sticky top-0 z-20 px-2 py-2 w-16 min-w-16 text-center border-b border-zinc-200 dark:border-zinc-800 ${
                     m.finalized
                       ? "bg-zinc-50 dark:bg-zinc-950"
                       : "bg-zinc-100 dark:bg-zinc-900 text-zinc-400"
                   }`}
                 >
-                  <span className="block font-mono text-xs">P{m.n}</span>
-                  <span className="block text-[9px] uppercase tracking-wide text-zinc-400 font-normal">
+                  <span className="block text-base leading-none" aria-hidden>
+                    {m.homeFlag || "·"}
+                  </span>
+                  <span className="block text-base leading-none mt-0.5" aria-hidden>
+                    {m.awayFlag || "·"}
+                  </span>
+                  <span className="block text-[9px] uppercase tracking-wide text-zinc-400 font-normal mt-0.5">
                     {m.stage}
                   </span>
                   <span className="block font-mono text-[11px] mt-0.5 text-zinc-700 dark:text-zinc-300 font-semibold">
@@ -176,9 +183,10 @@ export function AuditTable({
       <p className="text-xs text-zinc-500">
         Cada celda muestra los puntos <strong>por partido</strong> (arriba) y el{" "}
         <strong>marcador que puso esa persona</strong> (abajo). En el encabezado
-        de cada columna está el <strong>marcador real</strong>. Los partidos van
-        en orden de fecha (P1…P{matches.length}); pasa el cursor sobre el
-        encabezado para ver los equipos. Una vez un partido queda finalizado y
+        de cada columna están las <strong>banderas de las dos selecciones</strong>{" "}
+        y el <strong>marcador real</strong>. Los partidos van en orden de fecha;
+        pasa el cursor sobre el encabezado para ver los equipos, la fecha y el
+        número de partido. Una vez un partido queda finalizado y
         actualizado, su puntaje no debería volver a cambiar. No incluye los
         puntos de la predicción general.
       </p>
