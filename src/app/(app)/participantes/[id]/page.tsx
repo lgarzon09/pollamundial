@@ -16,7 +16,7 @@ import { KORoundBlock } from "@/components/KORoundBlock";
 import { BracketScoreBreakdown } from "@/components/BracketScoreBreakdown";
 import { PointsBadge } from "@/components/PointsBadge";
 import { bracketPickPoints, scoreBracket, type PickPoints } from "@/lib/scoring";
-import { makeSlotResolver } from "@/lib/bracket";
+import { makeSlotResolver, withOfficialMatchTeams } from "@/lib/bracket";
 
 export const dynamic = "force-dynamic";
 
@@ -71,12 +71,17 @@ export default async function ParticipanteDetalle({
     ? tournamentStart.getTime() <= Date.now()
     : false;
   const br = (bracket as BracketPrediction | null) ?? null;
-  const matchList = (matches ?? []) as Match[];
 
   // Desglose de puntos de la predicción general (sólo si el admin ya cargó
   // algo del resultado oficial / premios). Mismo cálculo que en "mi resumen".
   const officialBracket = (official as BracketResults | null) ?? null;
   const tournamentResults = (tournament as TournamentResults | null) ?? null;
+
+  // Rellena los equipos KO ya confirmados por el resultado oficial del torneo.
+  const matchList = withOfficialMatchTeams(
+    (matches ?? []) as Match[],
+    officialBracket,
+  );
   const officialDataReady =
     (!!officialBracket &&
       (Object.keys(officialBracket.group_positions ?? {}).length > 0 ||

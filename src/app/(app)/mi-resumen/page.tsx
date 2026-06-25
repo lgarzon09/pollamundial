@@ -25,7 +25,7 @@ import {
   totalMatchPoints,
   type PickPoints,
 } from "@/lib/scoring";
-import { makeSlotResolver } from "@/lib/bracket";
+import { makeSlotResolver, withOfficialMatchTeams } from "@/lib/bracket";
 import { fetchAllRows } from "@/lib/db/fetchAll";
 
 export const dynamic = "force-dynamic";
@@ -95,13 +95,17 @@ export default async function ResumenPage() {
     (results ?? []).map((r) => [r.match_id, r as MatchResult]),
   );
 
-  const matchList = (matches ?? []) as Match[];
-  const totals = totalMatchPoints(matchList, predictionsByMatch, resultsByMatch);
-  const totalPredicted = predictionsByMatch.size;
-
   // Bracket oficial (realidad) + premios oficiales para puntuar la predicción general
   const officialBracket = (official as BracketResults | null) ?? null;
   const tournamentResults = (tournament as TournamentResults | null) ?? null;
+
+  // Rellena los equipos KO ya confirmados por el resultado oficial del torneo.
+  const matchList = withOfficialMatchTeams(
+    (matches ?? []) as Match[],
+    officialBracket,
+  );
+  const totals = totalMatchPoints(matchList, predictionsByMatch, resultsByMatch);
+  const totalPredicted = predictionsByMatch.size;
   const bracketsByUser = new Map<string, BracketPrediction>(
     ((allBrackets ?? []) as BracketPrediction[]).map((b) => [b.user_id, b]),
   );

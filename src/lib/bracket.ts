@@ -1,7 +1,7 @@
 // Resolución de los slots del bracket (qué equipo concreto ocupa cada lado de
 // un partido KO), según la predicción del usuario. Espejo de la lógica de
 // resolveSlotTeam() en BracketForm.tsx, pero pura para usar en server.
-import type { Match } from "./db/types";
+import type { BracketResults, Match } from "./db/types";
 import type { BracketShape } from "./scoring";
 
 export type SlotResolver = (
@@ -49,4 +49,26 @@ export function makeSlotResolver(
 
     return null;
   };
+}
+
+/**
+ * Rellena los equipos de los partidos KO con los que YA están confirmados por el
+ * resultado OFICIAL del torneo (bracket_results): 1°/2° de grupo y 3° asignados
+ * para R32, ganadores reales para rondas siguientes. No toca partidos de grupos
+ * ni los que ya tienen equipo asignado. Devuelve copias sólo de los que cambian.
+ */
+export function withOfficialMatchTeams(
+  matches: Match[],
+  official: BracketResults | null,
+): Match[] {
+  if (!official) return matches;
+  const byId = new Map(matches.map((m) => [m.id, m]));
+  const resolve = makeSlotResolver(official, byId);
+  return matches.map((m) => {
+    if (m.stage === "group") return m;
+    const home = m.home_team_id ?? resolve(m.id, m.home_placeholder);
+    const away = m.away_team_id ?? resolve(m.id, m.away_placeholder);
+    if (home === m.home_team_id && away === m.away_team_id) return m;
+    return { ...m, home_team_id: home, away_team_id: away };
+  });
 }

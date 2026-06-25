@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type {
+  BracketResults,
   Match,
   MatchPrediction,
   MatchResult,
@@ -7,6 +8,7 @@ import type {
   Team,
 } from "@/lib/db/types";
 import { PredictionsByDay } from "@/components/PredictionsByDay";
+import { withOfficialMatchTeams } from "@/lib/bracket";
 import { fetchAllRows } from "@/lib/db/fetchAll";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +28,7 @@ export default async function PrediccionesPartidosPage() {
     { data: settings },
     { data: allPredictions },
     { data: profiles },
+    { data: official },
   ] = await Promise.all([
     supabase.from("matches").select("*").order("kickoff_at", { ascending: true }),
     supabase.from("match_predictions").select("*").eq("user_id", user.id),
@@ -43,7 +46,14 @@ export default async function PrediccionesPartidosPage() {
         .range(from, to),
     ).then((data) => ({ data })),
     supabase.from("profiles").select("id, display_name"),
+    supabase.from("bracket_results").select("*").eq("id", 1).maybeSingle(),
   ]);
+
+  // Rellena los equipos KO ya confirmados por el resultado oficial del torneo.
+  const matchList = withOfficialMatchTeams(
+    (matches ?? []) as Match[],
+    (official as BracketResults | null) ?? null,
+  );
 
   return (
     <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
@@ -79,7 +89,7 @@ export default async function PrediccionesPartidosPage() {
       </header>
 
       <PredictionsByDay
-        matches={(matches ?? []) as Match[]}
+        matches={matchList}
         teams={(teams ?? []) as Team[]}
         predictions={(predictions ?? []) as MatchPrediction[]}
         results={(results ?? []) as MatchResult[]}

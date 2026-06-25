@@ -15,7 +15,7 @@ export function KORoundBlock({
   matches: Match[];
   winners: Record<string, string>;
   teamsById: Map<string, Team>;
-  /** Puntos+razones por match_id del pick (opcional, sólo con resultado oficial). */
+  /** Puntos+razones por match_id del pick ganador (opcional, sólo con resultado oficial). */
   points?: Record<string, PickPoints>;
   /** Resuelve qué equipo concreto ocupa cada lado del partido según el bracket. */
   resolve?: SlotResolver;
@@ -33,6 +33,7 @@ export function KORoundBlock({
           const homeId = resolve ? resolve(m.id, m.home_placeholder) : null;
           const awayId = resolve ? resolve(m.id, m.away_placeholder) : null;
           const pick = points?.[m.id.toString()];
+          const earned = !!pick && pick.total > 0; // tu pick ganador SÍ sumó
           const resolved = !!(homeId || awayId);
 
           return (
@@ -51,52 +52,39 @@ export function KORoundBlock({
                     <TeamSide
                       teamId={homeId}
                       teamsById={teamsById}
-                      isWinner={!!winnerId && winnerId === homeId}
+                      isPick={!!winnerId && winnerId === homeId}
+                      earned={earned && winnerId === homeId}
                     />
                     <span className="text-zinc-400 text-xs">vs</span>
                     <TeamSide
                       teamId={awayId}
                       teamsById={teamsById}
-                      isWinner={!!winnerId && winnerId === awayId}
+                      isPick={!!winnerId && winnerId === awayId}
+                      earned={earned && winnerId === awayId}
                     />
                   </div>
-                  {/* Si el ganador elegido no es ninguno de los lados resueltos */}
-                  {winnerId &&
-                    winnerId !== homeId &&
-                    winnerId !== awayId &&
-                    (() => {
-                      const w = teamsById.get(winnerId);
-                      return (
-                        <div className="text-xs mt-0.5">
-                          <span className="text-zinc-400">tu pick: </span>
-                          <span className="font-medium">
-                            {w ? `${w.flag_emoji} ${w.name}` : "?"}
-                          </span>
-                          <PointsBadge pick={pick} />
-                        </div>
-                      );
-                    })()}
-                  {/* Razón/puntos cuando el pick sí es uno de los lados */}
-                  {pick && (winnerId === homeId || winnerId === awayId) && (
+                  {/* Puntos ganados por el pick (cuando sumó) */}
+                  {earned && (
                     <div className="mt-0.5">
                       <PointsBadge pick={pick} />
                     </div>
                   )}
                 </>
               ) : (
-                // Sin bracket resuelto: comportamiento simple (sólo el pick).
+                // Sin bracket resuelto: sólo el equipo elegido como ganador.
                 <div className="flex items-center justify-between gap-2 mt-0.5">
-                  <span className="font-medium whitespace-nowrap">
+                  <span className="whitespace-nowrap">
                     {winnerId ? (
-                      (() => {
-                        const w = teamsById.get(winnerId);
-                        return w ? `${w.flag_emoji} ${w.name}` : "?";
-                      })()
+                      <PickName
+                        team={teamsById.get(winnerId)}
+                        isPick
+                        earned={earned}
+                      />
                     ) : (
                       <span className="text-zinc-400 italic text-xs">sin pick</span>
                     )}
                   </span>
-                  <PointsBadge pick={pick} />
+                  {earned && <PointsBadge pick={pick} />}
                 </div>
               )}
             </li>
@@ -110,29 +98,60 @@ export function KORoundBlock({
 function TeamSide({
   teamId,
   teamsById,
-  isWinner,
+  isPick,
+  earned,
 }: {
   teamId: string | null;
   teamsById: Map<string, Team>;
-  isWinner: boolean;
+  isPick: boolean;
+  earned: boolean;
 }) {
   const team = teamId ? teamsById.get(teamId) : null;
-  return (
-    <span
-      className={
-        isWinner
-          ? "font-semibold text-emerald-700 dark:text-emerald-300"
-          : "text-zinc-500 dark:text-zinc-400"
-      }
-    >
-      {isWinner && <span className="mr-0.5">✓</span>}
-      {team ? (
-        <>
-          {team.flag_emoji} {team.name}
-        </>
-      ) : (
-        <span className="italic text-xs text-zinc-400">?</span>
-      )}
-    </span>
+  return <PickName team={team} isPick={isPick} earned={earned} />;
+}
+
+/**
+ * Diferencia visual:
+ * - "ganó puntos" → texto verde con ✓ (sólo cuando el pick realmente sumó)
+ * - "el que elegí" (sin sumar aún) → texto en negrita + etiqueta "tu pick", sin verde
+ * - el otro equipo → atenuado
+ */
+function PickName({
+  team,
+  isPick,
+  earned,
+}: {
+  team: Team | null | undefined;
+  isPick: boolean;
+  earned: boolean;
+}) {
+  const name = team ? (
+    <>
+      {team.flag_emoji} {team.name}
+    </>
+  ) : (
+    <span className="italic text-xs text-zinc-400">?</span>
   );
+
+  if (earned) {
+    return (
+      <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+        <span className="mr-0.5">✓</span>
+        {name}
+      </span>
+    );
+  }
+  if (isPick) {
+    return (
+      <span className="inline-flex items-baseline gap-1">
+        <span className="font-semibold text-zinc-800 dark:text-zinc-100">
+          {name}
+        </span>
+        <span className="text-[9px] uppercase tracking-wide rounded px-1 py-px border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400">
+          tu pick
+        </span>
+      </span>
+    );
+  }
+  return <span className="text-zinc-500 dark:text-zinc-400">{name}</span>;
 }
