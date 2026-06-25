@@ -8,6 +8,12 @@ export type AuditMatch = {
   stage: string; // etiqueta corta de etapa
   finalized: boolean;
   label: string; // "🇲🇽 México vs 🇿🇦 Sudáfrica · 11 jun" (para el tooltip)
+  real: string | null; // marcador real "2–1" si está finalizado
+};
+
+export type AuditCell = {
+  pts: number | null; // null = partido sin resultado aún
+  pred: string | null; // marcador que puso el usuario "2–1" (null si no predijo)
 };
 
 export type AuditRow = {
@@ -15,7 +21,7 @@ export type AuditRow = {
   name: string;
   isAdmin: boolean;
   total: number; // puntos por partido (suma de las celdas finalizadas)
-  cells: (number | null)[]; // alineado con matches; null = partido sin resultado aún
+  cells: AuditCell[]; // alineado con matches
 };
 
 const fmt = (n: number) => n.toString().replace(/\.0$/, "");
@@ -71,7 +77,7 @@ export function AuditTable({
                 <th
                   key={m.id}
                   title={`P${m.n} · ${m.label}${m.finalized ? "" : " · sin resultado"}`}
-                  className={`sticky top-0 z-20 px-2 py-2 w-12 min-w-12 text-center border-b border-zinc-200 dark:border-zinc-800 ${
+                  className={`sticky top-0 z-20 px-2 py-2 w-16 min-w-16 text-center border-b border-zinc-200 dark:border-zinc-800 ${
                     m.finalized
                       ? "bg-zinc-50 dark:bg-zinc-950"
                       : "bg-zinc-100 dark:bg-zinc-900 text-zinc-400"
@@ -80,6 +86,9 @@ export function AuditTable({
                   <span className="block font-mono text-xs">P{m.n}</span>
                   <span className="block text-[9px] uppercase tracking-wide text-zinc-400 font-normal">
                     {m.stage}
+                  </span>
+                  <span className="block font-mono text-[11px] mt-0.5 text-zinc-700 dark:text-zinc-300 font-semibold">
+                    {m.real ?? "—"}
                   </span>
                 </th>
               ))}
@@ -123,15 +132,28 @@ export function AuditTable({
                   {r.cells.map((c, i) => (
                     <td
                       key={matches[i].id}
-                      className={`px-2 py-1.5 w-12 min-w-12 text-center font-mono border-b border-zinc-100 dark:border-zinc-800 ${
-                        c === null
-                          ? "text-zinc-300 dark:text-zinc-700"
-                          : c > 0
-                            ? "text-emerald-700 dark:text-emerald-400 font-semibold"
-                            : "text-zinc-400 dark:text-zinc-600"
-                      }`}
+                      className="px-2 py-1.5 w-16 min-w-16 text-center border-b border-zinc-100 dark:border-zinc-800"
                     >
-                      {c === null ? "·" : fmt(c)}
+                      {c.pts === null ? (
+                        <span className="font-mono text-zinc-300 dark:text-zinc-700">
+                          ·
+                        </span>
+                      ) : (
+                        <>
+                          <span
+                            className={`block font-mono font-semibold ${
+                              c.pts > 0
+                                ? "text-emerald-700 dark:text-emerald-400"
+                                : "text-zinc-400 dark:text-zinc-600"
+                            }`}
+                          >
+                            {fmt(c.pts)}
+                          </span>
+                          <span className="block font-mono text-[10px] text-zinc-400 dark:text-zinc-500">
+                            {c.pred ?? "—"}
+                          </span>
+                        </>
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -152,11 +174,13 @@ export function AuditTable({
       </div>
 
       <p className="text-xs text-zinc-500">
-        Cada celda muestra los puntos <strong>por partido</strong> que ganó esa
-        persona en ese partido (P1…P{matches.length}, en orden de fecha). Solo
-        cambia si el admin corrige el resultado oficial de un partido — no
-        cambia día a día. Pasa el cursor sobre el encabezado para ver el
-        partido. No incluye los puntos de la predicción general.
+        Cada celda muestra los puntos <strong>por partido</strong> (arriba) y el{" "}
+        <strong>marcador que puso esa persona</strong> (abajo). En el encabezado
+        de cada columna está el <strong>marcador real</strong>. Los partidos van
+        en orden de fecha (P1…P{matches.length}); pasa el cursor sobre el
+        encabezado para ver los equipos. Una vez un partido queda finalizado y
+        actualizado, su puntaje no debería volver a cambiar. No incluye los
+        puntos de la predicción general.
       </p>
     </div>
   );

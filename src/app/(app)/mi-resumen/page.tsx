@@ -536,6 +536,33 @@ export default async function ResumenPage() {
         />
       </section>
 
+      {/* Puntos partido a partido (encima del ranking) */}
+      <Link
+        href="/auditoria"
+        className="group flex items-center justify-between gap-3 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 px-4 sm:px-5 py-4 hover:bg-emerald-100/70 dark:hover:bg-emerald-900/50 transition-colors"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-2xl shrink-0" aria-hidden>
+            🔎
+          </span>
+          <div className="min-w-0">
+            <p className="font-semibold text-emerald-900 dark:text-emerald-200">
+              Puntos partido a partido
+            </p>
+            <p className="text-sm text-emerald-800 dark:text-emerald-300 truncate">
+              Mira cuántos puntos ganó cada quien en cada partido. Verifica de
+              dónde sale el puntaje.
+            </p>
+          </div>
+        </div>
+        <span
+          className="text-emerald-600 dark:text-emerald-400 shrink-0 group-hover:translate-x-0.5 transition-transform"
+          aria-hidden
+        >
+          →
+        </span>
+      </Link>
+
       {/* Ranking */}
       <details
         open
@@ -544,12 +571,6 @@ export default async function ResumenPage() {
         <summary className="px-4 sm:px-5 py-3 cursor-pointer flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800/40 list-none">
           <h2 className="font-semibold">Ranking</h2>
           <div className="flex items-center gap-3 text-sm">
-            <Link
-              href="/auditoria"
-              className="text-emerald-600 hover:underline"
-            >
-              Auditoría
-            </Link>
             <Link
               href="/participantes"
               className="text-emerald-600 hover:underline"

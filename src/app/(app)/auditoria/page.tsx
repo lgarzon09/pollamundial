@@ -68,16 +68,21 @@ export default async function AuditoriaPage() {
     }
     return ph ?? "?";
   };
-  const matchCols: AuditMatch[] = matchList.map((m, i) => ({
-    id: m.id,
-    n: i + 1,
-    stage: STAGE_SHORT[m.stage],
-    finalized: !!resultsByMatch.get(m.id)?.is_finalized,
-    label: `${teamLabel(m.home_team_id, m.home_placeholder)} vs ${teamLabel(
-      m.away_team_id,
-      m.away_placeholder,
-    )} · ${DAY_FMT.format(new Date(m.kickoff_at))}`,
-  }));
+  const matchCols: AuditMatch[] = matchList.map((m, i) => {
+    const r = resultsByMatch.get(m.id) ?? null;
+    const finalized = !!r?.is_finalized;
+    return {
+      id: m.id,
+      n: i + 1,
+      stage: STAGE_SHORT[m.stage],
+      finalized,
+      label: `${teamLabel(m.home_team_id, m.home_placeholder)} vs ${teamLabel(
+        m.away_team_id,
+        m.away_placeholder,
+      )} · ${DAY_FMT.format(new Date(m.kickoff_at))}`,
+      real: finalized ? `${r!.home_score_90}–${r!.away_score_90}` : null,
+    };
+  });
 
   // Predicciones por usuario.
   const predsByUser = new Map<string, Map<number, MatchPrediction>>();
@@ -93,10 +98,14 @@ export default async function AuditoriaPage() {
       let total = 0;
       const cells = matchList.map((m) => {
         const r = resultsByMatch.get(m.id) ?? null;
-        if (!r?.is_finalized) return null; // partido sin resultado aún
-        const pts = scoreMatch(m, preds.get(m.id) ?? null, r).total;
+        if (!r?.is_finalized) return { pts: null, pred: null }; // sin resultado aún
+        const pred = preds.get(m.id) ?? null;
+        const pts = scoreMatch(m, pred, r).total;
         total += pts;
-        return pts;
+        return {
+          pts,
+          pred: pred ? `${pred.home_score_90}–${pred.away_score_90}` : null,
+        };
       });
       return {
         id: p.id,
@@ -116,12 +125,14 @@ export default async function AuditoriaPage() {
             ← Inicio
           </Link>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-bold">Auditoría de puntos</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold">
+          Puntos partido a partido
+        </h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400 max-w-3xl">
           Puntos <strong>por partido</strong> de cada participante, partido por
           partido. Sirve para verificar de dónde sale el puntaje de cada quien.
-          Los valores quedan fijos una vez el admin carga el resultado oficial
-          de un partido.
+          Una vez un partido queda finalizado y actualizado, su puntaje no
+          debería volver a cambiar.
         </p>
       </header>
 

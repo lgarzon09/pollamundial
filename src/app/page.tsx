@@ -38,20 +38,14 @@ export default async function Home() {
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-6">
             <Link
-              href="/signup"
+              href="/login"
               className="inline-flex items-center justify-center rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-base px-8 py-3.5 transition-colors shadow-lg shadow-emerald-500/20"
             >
-              Únete a la polla
-            </Link>
-            <Link
-              href="/login"
-              className="inline-flex items-center justify-center rounded-full border-2 border-zinc-300 dark:border-zinc-700 hover:border-emerald-500 dark:hover:border-emerald-500 font-semibold text-base px-8 py-3.5 transition-colors"
-            >
-              Ya tengo cuenta
+              Iniciar sesión
             </Link>
           </div>
           <p className="text-xs text-zinc-500 pt-2">
-            Sin tarjeta · sin pagar · solo invitación
+            Las inscripciones están cerradas.
           </p>
         </div>
       </section>
@@ -66,20 +60,14 @@ export default async function Home() {
             ¿Listo para jugar?
           </h2>
           <p className="text-lg sm:text-xl text-white/90">
-            Crea tu cuenta en 1 minuto y empieza a llenar tus predicciones.
+            Inicia sesión y sigue llenando tus predicciones.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
             <Link
-              href="/signup"
+              href="/login"
               className="inline-flex items-center justify-center rounded-full bg-white text-emerald-700 hover:bg-emerald-50 font-bold text-base px-8 py-3.5 transition-colors shadow-lg"
             >
-              Únete a la polla
-            </Link>
-            <Link
-              href="/login"
-              className="inline-flex items-center justify-center rounded-full border-2 border-white/40 hover:bg-white/10 font-semibold text-base px-8 py-3.5 transition-colors"
-            >
-              Ya tengo cuenta
+              Iniciar sesión
             </Link>
           </div>
         </div>

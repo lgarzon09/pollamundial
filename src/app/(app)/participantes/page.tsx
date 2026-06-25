@@ -52,7 +52,7 @@ export default async function ParticipantesPage() {
         </p>
         <p className="text-sm mt-2">
           <Link href="/auditoria" className="text-emerald-600 hover:underline">
-            Ver auditoría de puntos por partido →
+            Ver puntos partido a partido →
           </Link>
         </p>
       </header>
