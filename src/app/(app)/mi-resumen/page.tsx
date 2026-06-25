@@ -545,6 +545,12 @@ export default async function ResumenPage() {
           <h2 className="font-semibold">Ranking</h2>
           <div className="flex items-center gap-3 text-sm">
             <Link
+              href="/auditoria"
+              className="text-emerald-600 hover:underline"
+            >
+              Auditoría
+            </Link>
+            <Link
               href="/participantes"
               className="text-emerald-600 hover:underline"
             >

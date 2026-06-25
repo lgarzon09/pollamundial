@@ -50,6 +50,11 @@ export default async function ParticipantesPage() {
           Progreso de cada participante. Haz clic en uno para ver sus
           predicciones (las que ya estén disponibles).
         </p>
+        <p className="text-sm mt-2">
+          <Link href="/auditoria" className="text-emerald-600 hover:underline">
+            Ver auditoría de puntos por partido →
+          </Link>
+        </p>
       </header>
 
       {participants.length === 0 ? (
