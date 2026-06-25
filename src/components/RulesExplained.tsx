@@ -14,7 +14,14 @@ export function RulesExplained() {
               2 formas de ganar puntos
             </h2>
             <p className="text-lg text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">
-              Suman ambas. Tu puntaje final es la suma de las dos.
+              Suman ambas. Tu puntaje que define el ranking es el{" "}
+              <strong>Total = General + Por partido</strong>.
+            </p>
+            <p className="text-sm text-zinc-500 max-w-2xl mx-auto">
+              El ranking se ordena por ese <strong>Total</strong>. En tu perfil
+              y en la tabla ves las tres columnas por separado:{" "}
+              <strong>Total</strong>, <strong>General</strong> y{" "}
+              <strong>Por partido</strong>.
             </p>
           </header>
           <div className="grid md:grid-cols-2 gap-5">
@@ -166,7 +173,7 @@ export function RulesExplained() {
               Puntos por predicción general
             </h2>
             <p className="text-lg text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">
-              Cada equipo que acertaste en su lugar real te suma a medida que
+              Cada equipo que llega a donde lo pusiste te suma a medida que
               avanza el torneo.
             </p>
           </header>
@@ -181,6 +188,30 @@ export function RulesExplained() {
             <BracketPointRow label="Clasifica a semifinales" pts="15 pts × equipo" />
             <BracketPointRow label="Equipo finalista" pts="20 pts × equipo" />
             <BracketPointRow label="🏆 Campeón del Mundial" pts="30 pts" big />
+          </div>
+
+          {/* Aclaración clave: las clasificaciones se cuentan por equipo */}
+          <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 p-5 sm:p-8 space-y-3">
+            <h3 className="text-xl font-bold text-amber-900 dark:text-amber-200">
+              ⚠️ Lo más importante de entender
+            </h3>
+            <p className="text-sm text-amber-900 dark:text-amber-100">
+              Los puntos de avance (Ronda de 32, octavos, cuartos, semis,
+              finalista) se cuentan <strong>por equipo, no por la llave
+              exacta</strong>. No importa contra quién juega el equipo ni en qué
+              posición quedó: solo importa si el equipo que pusiste{" "}
+              <strong>realmente llegó a esa ronda</strong>.
+            </p>
+            <p className="text-sm text-amber-900 dark:text-amber-100">
+              Ejemplo: pusiste que <strong>Sudáfrica</strong> pasaba a octavos.
+              En la realidad clasificó en otra posición y jugó otra llave, pero
+              igual llegó a octavos → <strong>sumas sus puntos igual</strong>.
+            </p>
+            <p className="text-sm text-amber-900 dark:text-amber-100">
+              La <strong>única excepción</strong> es la{" "}
+              <strong>posición exacta de grupo</strong> (+3): esa sí exige que el
+              equipo quede en el puesto exacto que predijiste.
+            </p>
           </div>
         </div>
       </section>
@@ -232,7 +263,7 @@ export function RulesExplained() {
             <RuleRow
               icon="⚖️"
               title="Desempate"
-              desc="Primero más marcadores exactos. Después más aciertos en fases finales. Por último, fecha de registro."
+              desc="Si dos personas tienen el mismo Total, gana quien tenga más marcadores exactos acertados. Si aún hay empate, se ordena por nombre."
             />
             <RuleRow
               icon="💸"
