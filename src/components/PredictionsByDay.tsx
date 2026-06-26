@@ -11,7 +11,7 @@ import type {
 import { TeamLabel } from "@/components/TeamLabel";
 import { StageBadge } from "@/components/StageBadge";
 import { MatchPredictionCard } from "@/components/MatchPredictionCard";
-import { LocalTime } from "@/components/LocalDateTime";
+import { LocalTime, LocalDateTimeFull } from "@/components/LocalDateTime";
 import { maxPointsPerMatch, scoreMatch } from "@/lib/scoring";
 import type { MatchScore } from "@/lib/scoring";
 
@@ -480,6 +480,15 @@ function ReadOnlyPrediction({
         </span>{" "}
         ({home.name} vs {away.name} a 90 min)
       </p>
+      <p className="text-xs text-zinc-400 dark:text-zinc-500">
+        Última modificación:{" "}
+        <LocalDateTimeFull iso={prediction.updated_at} />
+        {new Date(prediction.updated_at).getTime() -
+          new Date(prediction.created_at).getTime() >
+        1000
+          ? " · editada"
+          : " · sin cambios desde que se creó"}
+      </p>
       {match.is_knockout && isDraw90 && koWinner && (
         <p className="text-zinc-600 dark:text-zinc-400">
           En alargue/penales: gana <strong>{koWinner.name}</strong>
@@ -632,13 +641,18 @@ function AllPredictionsBlock({
                       : "cursor-default"
                   }`}
                 >
-                  <span className="truncate min-w-0">
-                    {name}
-                    {koWinner && (
-                      <span className="text-zinc-400 ml-1">
-                        (gana {koWinner.name})
-                      </span>
-                    )}
+                  <span className="min-w-0">
+                    <span className="truncate block">
+                      {name}
+                      {koWinner && (
+                        <span className="text-zinc-400 ml-1">
+                          (gana {koWinner.name})
+                        </span>
+                      )}
+                    </span>
+                    <span className="block text-[10px] text-zinc-400 dark:text-zinc-500">
+                      mod. <LocalDateTimeFull iso={p.updated_at} />
+                    </span>
                   </span>
                   <span className="font-mono">
                     {p.home_score_90}–{p.away_score_90}

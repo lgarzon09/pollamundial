@@ -12,6 +12,7 @@ import type {
   TournamentResults,
 } from "@/lib/db/types";
 import { PredictionsByDay } from "@/components/PredictionsByDay";
+import { LocalDateTimeFull } from "@/components/LocalDateTime";
 import { KORoundBlock } from "@/components/KORoundBlock";
 import { BracketScoreBreakdown } from "@/components/BracketScoreBreakdown";
 import { PointsBadge } from "@/components/PointsBadge";
@@ -173,6 +174,18 @@ export default async function ParticipanteDetalle({
           </p>
         ) : (
           <div className="p-5 space-y-5 text-sm border-t border-zinc-100 dark:border-zinc-800">
+            <p className="text-xs text-zinc-400 dark:text-zinc-500">
+              Última modificación:{" "}
+              <LocalDateTimeFull iso={br.updated_at} />
+              {br.submitted_at ? (
+                <>
+                  {" · enviada el "}
+                  <LocalDateTimeFull iso={br.submitted_at} />
+                </>
+              ) : (
+                " · en borrador"
+              )}
+            </p>
             {bracketScore && (
               <BracketScoreBreakdown
                 score={bracketScore}

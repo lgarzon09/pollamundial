@@ -35,3 +35,23 @@ export function LocalDate({ iso }: { iso: string }) {
   }, [iso]);
   return <span suppressHydrationWarning>{text}</span>;
 }
+
+// Fecha + hora completas (día, mes, año, hora:minuto) en la TZ del navegador.
+// Útil para sellos de "última modificación" donde importa el momento exacto.
+const FULL_OPTS: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+};
+
+export function LocalDateTimeFull({ iso }: { iso: string }) {
+  const [text, setText] = useState<string>(() =>
+    new Intl.DateTimeFormat("es-CO", FULL_OPTS).format(new Date(iso)),
+  );
+  useEffect(() => {
+    setText(new Intl.DateTimeFormat("es-CO", FULL_OPTS).format(new Date(iso)));
+  }, [iso]);
+  return <span suppressHydrationWarning>{text}</span>;
+}

@@ -128,6 +128,12 @@ export default async function AuditoriaPage() {
           <Link href="/mi-resumen" className="text-zinc-500 hover:text-emerald-600">
             ← Inicio
           </Link>
+          <Link
+            href="/auditoria/cambios"
+            className="text-zinc-500 hover:text-emerald-600"
+          >
+            Auditoría de cambios →
+          </Link>
         </div>
         <h1 className="text-2xl sm:text-3xl font-bold">
           Puntos partido a partido
