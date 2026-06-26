@@ -563,6 +563,31 @@ export default async function ResumenPage() {
         </span>
       </Link>
 
+      {/* Auditoría de cambios */}
+      <Link
+        href="/auditoria/cambios"
+        className="group flex items-center justify-between gap-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 sm:px-5 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-2xl shrink-0" aria-hidden>
+            🕒
+          </span>
+          <div className="min-w-0">
+            <p className="font-semibold">Auditoría de cambios</p>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 truncate">
+              Cuándo creó o editó cada quien sus predicciones (hora local) y la
+              hora del partido. Por transparencia.
+            </p>
+          </div>
+        </div>
+        <span
+          className="text-zinc-400 shrink-0 group-hover:translate-x-0.5 transition-transform"
+          aria-hidden
+        >
+          →
+        </span>
+      </Link>
+
       {/* Ranking */}
       <details
         open

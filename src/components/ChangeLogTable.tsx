@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { LocalDateTimeFull } from "@/components/LocalDateTime";
+import {
+  LocalDateTimeFull,
+  LocalDateTimeShort,
+} from "@/components/LocalDateTime";
 
 // Una fila = la última modificación de UNA predicción de UNA persona.
 // La BD sólo guarda el estado actual + updated_at, así que esto refleja el
@@ -12,8 +15,9 @@ export type ChangeRow = {
   name: string;
   isAdmin: boolean;
   kind: "match" | "bracket";
-  what: string; // "P12 · 🇲🇽 México vs 🇿🇦 Sudáfrica" o "Predicción general"
+  what: string; // "P59 · 🇹🇷 Turquía vs 🇺🇸 Estados Unidos" o "Predicción general"
   value: string | null; // "2–1", "enviada", etc.
+  kickoffIso: string | null; // hora del partido (sólo predicciones por partido)
   createdAt: string; // ISO
   updatedAt: string; // ISO
   edited: boolean; // updatedAt notablemente posterior a createdAt
@@ -105,10 +109,21 @@ export function ChangeLogTable({
         </div>
       </div>
 
+      {/* Leyenda para no confundir las dos horas */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
+        <span className="text-sky-600 dark:text-sky-400">
+          🟢 Partido = cuándo se juega
+        </span>
+        <span className="text-emerald-600 dark:text-emerald-400">
+          ✎ Creada/Editada = cuándo se hizo la predicción
+        </span>
+        <span className="text-zinc-400">Ambas en tu hora local.</span>
+      </div>
+
       <p className="text-xs text-zinc-500">
-        {view.length} {view.length === 1 ? "cambio" : "cambios"} ·{" "}
+        {view.length} {view.length === 1 ? "predicción" : "predicciones"} ·{" "}
         <span className="text-zinc-400">
-          muestra la última modificación de cada predicción
+          muestra la última modificación de cada una
         </span>
       </p>
 
@@ -118,11 +133,12 @@ export function ChangeLogTable({
           return (
             <li
               key={r.key}
-              className={`px-3 sm:px-4 py-2.5 flex items-start gap-3 ${
+              className={`px-3 sm:px-4 py-3 flex items-start gap-3 ${
                 mine ? "bg-emerald-50/50 dark:bg-emerald-950/20" : ""
               }`}
             >
-              <div className="min-w-0 flex-1">
+              {/* Izquierda: quién y qué predicción (incluye hora del partido) */}
+              <div className="min-w-0 flex-1 space-y-0.5">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="font-medium text-sm">{r.name}</span>
                   {mine && (
@@ -137,9 +153,7 @@ export function ChangeLogTable({
                   )}
                   <span
                     className={`text-[10px] uppercase tracking-wider font-semibold ${
-                      r.kind === "bracket"
-                        ? "text-indigo-500"
-                        : "text-zinc-400"
+                      r.kind === "bracket" ? "text-indigo-500" : "text-zinc-400"
                     }`}
                   >
                     {r.kind === "bracket" ? "general" : "partido"}
@@ -148,27 +162,44 @@ export function ChangeLogTable({
                 <p className="text-xs text-zinc-600 dark:text-zinc-400 truncate">
                   {r.what}
                   {r.value && (
-                    <span className="font-mono font-semibold text-zinc-800 dark:text-zinc-200">
-                      {" · "}
-                      {r.value}
+                    <span className="text-zinc-800 dark:text-zinc-200">
+                      {r.kind === "match" ? " · marcador " : " · "}
+                      <span className="font-mono font-semibold">{r.value}</span>
                     </span>
                   )}
                 </p>
+                {r.kickoffIso && (
+                  <p className="text-[11px] text-sky-600 dark:text-sky-400">
+                    🟢 Partido:{" "}
+                    <span className="font-medium">
+                      <LocalDateTimeShort iso={r.kickoffIso} />
+                    </span>
+                  </p>
+                )}
               </div>
+
+              {/* Derecha: cuándo se creó/editó (etiqueta explícita) */}
               <div className="text-right shrink-0">
-                <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
+                <p
+                  className={`text-[10px] uppercase tracking-wider font-semibold ${
+                    r.edited
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-zinc-500"
+                  }`}
+                >
+                  ✎ {r.edited ? "Editada el" : "Creada el"}
+                </p>
+                <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 whitespace-nowrap">
                   <LocalDateTimeFull iso={r.updatedAt} />
                 </p>
-                <p className="text-[10px] text-zinc-400">
-                  {r.edited ? "editada" : "creada"}
-                </p>
+                <p className="text-[10px] text-zinc-400">hora local</p>
               </div>
             </li>
           );
         })}
         {view.length === 0 && (
           <li className="px-4 py-8 text-center text-sm text-zinc-500">
-            No hay cambios que mostrar.
+            No hay predicciones que mostrar.
           </li>
         )}
       </ul>

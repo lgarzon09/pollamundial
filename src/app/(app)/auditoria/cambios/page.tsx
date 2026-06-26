@@ -13,12 +13,6 @@ import { ChangeLogTable, type ChangeRow } from "@/components/ChangeLogTable";
 
 export const dynamic = "force-dynamic";
 
-const DAY_FMT = new Intl.DateTimeFormat("es-CO", {
-  timeZone: "America/Bogota",
-  day: "numeric",
-  month: "short",
-});
-
 // updated_at se considera "edición" sólo si es claramente posterior a created_at
 // (mismo insert deja ambos casi iguales; damos 1s de margen).
 const EDITED = (created: string, updated: string) =>
@@ -62,7 +56,11 @@ export default async function AuditoriaCambiosPage() {
     officialBracket,
   );
   // Número secuencial 1..N por orden de kickoff (igual que en "puntos partido a partido").
-  const matchInfo = new Map<number, { n: number; label: string }>();
+  // La hora del partido se pasa como ISO y se formatea en hora local en el cliente.
+  const matchInfo = new Map<
+    number,
+    { label: string; kickoffIso: string }
+  >();
   matchList.forEach((m, i) => {
     const teamLabel = (id: string | null, ph: string | null): string => {
       if (id) {
@@ -72,11 +70,11 @@ export default async function AuditoriaCambiosPage() {
       return ph ?? "?";
     };
     matchInfo.set(m.id, {
-      n: i + 1,
       label: `P${i + 1} · ${teamLabel(m.home_team_id, m.home_placeholder)} vs ${teamLabel(
         m.away_team_id,
         m.away_placeholder,
-      )} · ${DAY_FMT.format(new Date(m.kickoff_at))}`,
+      )}`,
+      kickoffIso: m.kickoff_at,
     });
   });
 
@@ -104,6 +102,7 @@ export default async function AuditoriaCambiosPage() {
       kind: "match",
       what: info?.label ?? `Partido ${p.match_id}`,
       value: `${p.home_score_90}–${p.away_score_90}`,
+      kickoffIso: info?.kickoffIso ?? null,
       createdAt: p.created_at,
       updatedAt: p.updated_at,
       edited: EDITED(p.created_at, p.updated_at),
@@ -124,6 +123,7 @@ export default async function AuditoriaCambiosPage() {
       kind: "bracket",
       what: "Predicción general (bracket)",
       value: b.submitted_at ? "enviada" : "borrador",
+      kickoffIso: null,
       createdAt: b.created_at,
       updatedAt: b.updated_at,
       edited: EDITED(b.created_at, b.updated_at),

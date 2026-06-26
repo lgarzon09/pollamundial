@@ -55,3 +55,24 @@ export function LocalDateTimeFull({ iso }: { iso: string }) {
   }, [iso]);
   return <span suppressHydrationWarning>{text}</span>;
 }
+
+// Día + hora SIN año (formato más corto, con día de semana) en la TZ del
+// navegador. Pensado para la hora del partido, para diferenciarla a simple
+// vista del sello de "última modificación" (que sí lleva año).
+const SHORT_OPTS: Intl.DateTimeFormatOptions = {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+};
+
+export function LocalDateTimeShort({ iso }: { iso: string }) {
+  const [text, setText] = useState<string>(() =>
+    new Intl.DateTimeFormat("es-CO", SHORT_OPTS).format(new Date(iso)),
+  );
+  useEffect(() => {
+    setText(new Intl.DateTimeFormat("es-CO", SHORT_OPTS).format(new Date(iso)));
+  }, [iso]);
+  return <span suppressHydrationWarning>{text}</span>;
+}
