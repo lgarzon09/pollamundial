@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { withOfficialMatchTeams } from "@/lib/bracket";
+import type { BracketResults, Match } from "@/lib/db/types";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -36,12 +38,19 @@ export async function saveMatchResult(input: SaveResultInput) {
     return { error: "Marcador inválido." };
   }
 
-  // Cargar el partido para validaciones
-  const { data: match } = await supabase
-    .from("matches")
-    .select("id, stage, home_team_id, away_team_id")
-    .eq("id", input.match_id)
-    .maybeSingle();
+  // Cargar TODOS los partidos + bracket oficial para resolver los equipos KO
+  // (1°/2° de grupo, 3° asignados, ganadores reales) igual que la página de
+  // resultados. Sin esto, los partidos de eliminatoria tienen home_team_id/
+  // away_team_id en null y la validación del ganador siempre falla.
+  const [{ data: allMatches }, { data: official }] = await Promise.all([
+    supabase.from("matches").select("*"),
+    supabase.from("bracket_results").select("*").eq("id", 1).maybeSingle(),
+  ]);
+  const resolvedMatches = withOfficialMatchTeams(
+    (allMatches ?? []) as Match[],
+    (official as BracketResults | null) ?? null,
+  );
+  const match = resolvedMatches.find((m) => m.id === input.match_id);
   if (!match) return { error: "Partido no encontrado." };
 
   const isKO = match.stage !== "group";
