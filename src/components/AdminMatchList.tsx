@@ -23,14 +23,17 @@ export function AdminMatchList({ matches, results, teams }: Props) {
   const [filter, setFilter] = useState<"all" | "pending" | "done">("pending");
 
   const filtered = useMemo(() => {
-    const now = Date.now();
+    const todayKey = dayKey(new Date().toISOString());
     return matches.filter((m) => {
       const r = resultsByMatch.get(m.id);
       if (filter === "done") return !!r?.is_finalized;
       if (filter === "pending") {
-        // Pendientes: ya jugados (kickoff pasó) sin resultado finalizado
-        const played = new Date(m.kickoff_at).getTime() < now;
-        return played && !r?.is_finalized;
+        // Pendientes: partidos de hoy o de días anteriores (en la TZ de la app)
+        // que aún no tienen resultado finalizado. Incluye los de hoy aunque su
+        // hora de inicio todavía no haya pasado, para poder cargarlos apenas
+        // terminen sin tener que esperar a que el reloj cruce el kickoff.
+        const isTodayOrPast = dayKey(m.kickoff_at) <= todayKey;
+        return isTodayOrPast && !r?.is_finalized;
       }
       return true;
     });
