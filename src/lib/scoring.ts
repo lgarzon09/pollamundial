@@ -1,4 +1,5 @@
 import type {
+  BracketResults,
   Match,
   MatchPrediction,
   MatchResult,
@@ -356,6 +357,92 @@ export function scoreBracket(
 
   const total = lines.reduce((s, l) => s + l.points, 0);
   return { total, lines };
+}
+
+/**
+ * Recorta el bracket OFICIAL a lo que YA era real a cierto corte temporal,
+ * fechando cada parte por el PARTIDO que la justifica (no por `updated_at`, que
+ * el admin pisa con "ahora" en cada guardado). Así los puntos GENERALES se
+ * atribuyen al día en que de verdad ocurrieron, igual que los puntos por partido,
+ * y la comparación "ayer / jornada anterior" deja de inflarse o caer a 0.
+ *
+ *  - Posiciones de grupo: cuentan cuando TODOS los partidos del grupo terminaron.
+ *  - Ganadores de cada ronda KO (r32/r16/qf/sf): cuando ese partido se finalizó
+ *    (la clave del dict ES el match_id).
+ *  - 3° lugares asignados: cuando terminaron TODOS los grupos.
+ *  - Finalistas: cuando se jugó su semifinal (derivado de sf_winners ya filtrado).
+ *  - Campeón: cuando se finalizó la final.
+ *
+ * Los premios (tournament_results) no tienen partido que los ancle: se entregan
+ * una sola vez al final, así que se siguen fechando por su `updated_at` (eso lo
+ * decide quien llama, pasando o no el objeto de premios a scoreBracket).
+ *
+ * `finalizedMatchIds` = ids de partidos con resultado finalizado al corte.
+ */
+export function bracketResultsAsOf(
+  official: BracketResults | null,
+  matches: Match[],
+  finalizedMatchIds: Set<number>,
+): BracketResults | null {
+  if (!official) return null;
+
+  // Partidos de grupo agrupados, para saber cuándo cada grupo quedó completo.
+  const groupMatchIds = new Map<string, number[]>();
+  for (const m of matches) {
+    if (m.stage === "group" && m.group_code) {
+      const arr = groupMatchIds.get(m.group_code) ?? [];
+      arr.push(m.id);
+      groupMatchIds.set(m.group_code, arr);
+    }
+  }
+  const groupDone = (g: string) => {
+    const ids = groupMatchIds.get(g);
+    return !!ids && ids.length > 0 && ids.every((id) => finalizedMatchIds.has(id));
+  };
+  const allGroupsDone =
+    groupMatchIds.size > 0 && [...groupMatchIds.keys()].every(groupDone);
+
+  const group_positions: Record<string, string[]> = {};
+  for (const [g, pos] of Object.entries(official.group_positions ?? {})) {
+    if (groupDone(g)) group_positions[g] = pos;
+  }
+
+  const filterByMatchKey = (dict: Record<string, string> | null | undefined) => {
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(dict ?? {})) {
+      if (finalizedMatchIds.has(Number(k))) out[k] = v;
+    }
+    return out;
+  };
+  const r32_winners = filterByMatchKey(official.r32_winners);
+  const r16_winners = filterByMatchKey(official.r16_winners);
+  const qf_winners = filterByMatchKey(official.qf_winners);
+  const sf_winners = filterByMatchKey(official.sf_winners);
+
+  const r32_third_place_assignments = allGroupsDone
+    ? official.r32_third_place_assignments ?? {}
+    : {};
+
+  // Finalistas: sólo los que ya salieron de una semifinal finalizada.
+  const sfWinnerTeams = new Set(Object.values(sf_winners));
+  const finalists = (official.finalists ?? []).filter((t) => sfWinnerTeams.has(t));
+
+  // Campeón: sólo si la final ya se finalizó.
+  const finalMatch = matches.find((m) => m.stage === "final");
+  const champion =
+    finalMatch && finalizedMatchIds.has(finalMatch.id) ? official.champion : null;
+
+  return {
+    ...official,
+    group_positions,
+    r32_third_place_assignments,
+    r32_winners,
+    r16_winners,
+    qf_winners,
+    sf_winners,
+    finalists,
+    champion,
+  };
 }
 
 /**

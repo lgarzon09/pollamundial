@@ -8,7 +8,7 @@ import type {
   Team,
   TournamentResults,
 } from "@/lib/db/types";
-import { scoreBracket, totalMatchPoints } from "@/lib/scoring";
+import { bracketResultsAsOf, scoreBracket, totalMatchPoints } from "@/lib/scoring";
 import { withOfficialMatchTeams } from "@/lib/bracket";
 import { fetchAllRows } from "@/lib/db/fetchAll";
 import { DailySummaryShare } from "@/components/DailySummaryShare";
@@ -93,25 +93,32 @@ export default async function ResumenDiarioPage() {
     finalized.filter((r) => dayOf(r.finalized_at)! < yesterday).map((r) => [r.match_id, r]),
   );
 
-  // Para los puntos GENERALES (predicción general): sólo cuentan los resultados
-  // oficiales del torneo cargados hasta cierto día. Se filtran de forma
-  // independiente el bracket oficial y los premios (pueden cargarse en días
-  // distintos), pasando null a scoreBracket cuando aún no aplican.
+  // Para los puntos GENERALES (predicción general): cada parte del bracket se
+  // fecha por el PARTIDO que la justifica (no por `updated_at`, que el admin pisa
+  // en cada guardado y haría aparecer todo el general de golpe). Recortamos el
+  // bracket oficial a lo que ya era real al cierre de ayer / antes de ayer; la
+  // diferencia aísla lo que el general sumó AYER, igual que los puntos por partido.
+  const idsThroughYesterday = new Set(resultsThroughYesterday.keys());
+  const idsBeforeYesterday = new Set(resultsBeforeYesterday.keys());
+  const offThroughYesterday = bracketResultsAsOf(
+    officialBracket,
+    matchList,
+    idsThroughYesterday,
+  );
+  const offBeforeYesterday = bracketResultsAsOf(
+    officialBracket,
+    matchList,
+    idsBeforeYesterday,
+  );
+  // Los premios no tienen partido que los ancle (se entregan una vez al final):
+  // se siguen fechando por su `updated_at`.
   const onOrBefore = (iso: string | null, day: string) => {
     const d = dayOf(iso);
     return d != null && d <= day;
   };
-  const offThroughYesterday =
-    officialBracket && onOrBefore(officialBracket.updated_at, yesterday)
-      ? officialBracket
-      : null;
   const tourThroughYesterday =
     tournamentResults && onOrBefore(tournamentResults.updated_at, yesterday)
       ? tournamentResults
-      : null;
-  const offBeforeYesterday =
-    officialBracket && dayOf(officialBracket.updated_at)! < yesterday
-      ? officialBracket
       : null;
   const tourBeforeYesterday =
     tournamentResults && dayOf(tournamentResults.updated_at)! < yesterday

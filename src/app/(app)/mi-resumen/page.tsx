@@ -20,6 +20,7 @@ import { BracketScoreBreakdown } from "@/components/BracketScoreBreakdown";
 import { PointsBadge } from "@/components/PointsBadge";
 import {
   bracketPickPoints,
+  bracketResultsAsOf,
   scoreBracket,
   scoreMatch,
   totalMatchPoints,
@@ -144,8 +145,9 @@ export default async function ResumenPage() {
 
   // Movimiento desde la "última jornada". Una jornada es el día (TZ Bogotá) del
   // evento más reciente que cambió puntajes: el último lote de partidos
-  // finalizados O la última carga de resultados oficiales (predicción general).
-  // El Δ y el cambio de puesto se calculan SIEMPRE sobre el TOTAL (general + por
+  // finalizados (que mueven puntos por partido Y los generales del bracket,
+  // anclados al partido) O la entrega de premios. El Δ y el cambio de puesto se
+  // calculan SIEMPRE sobre el TOTAL (general + por
   // partido) comparando contra el estado de antes de ese día.
   const BOGOTA_DAY = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Bogota",
@@ -179,25 +181,32 @@ export default async function ResumenPage() {
       ? [...finalizedResults.map(matchDayOf)].sort().at(-1)!
       : null;
 
-  // Día de la última carga de resultados oficiales (sólo si ya hay datos).
-  const officialUpdateDay = officialDataReady
-    ? ([officialBracket?.updated_at, tournamentResults?.updated_at]
-        .filter(Boolean)
-        .map((d) => BOGOTA_DAY.format(new Date(d as string)))
-        .sort()
-        .at(-1) ?? null)
-    : null;
+  // Los puntos GENERALES del bracket ya NO dependen de cuándo el admin guardó:
+  // cada parte se ancla al partido que la justifica (ver bracketResultsAsOf), así
+  // que el general cambia los MISMOS días que finalizan los partidos. Lo único
+  // que tiene día propio son los PREMIOS (tournament_results): se entregan una
+  // sola vez al final, sin partido que los ancle.
+  const awardsReady =
+    !!tournamentResults &&
+    !!(
+      tournamentResults.top_scorer ||
+      tournamentResults.golden_ball ||
+      tournamentResults.golden_glove ||
+      tournamentResults.young_player ||
+      tournamentResults.revelation_team
+    );
+  const awardsDay =
+    awardsReady && tournamentResults
+      ? BOGOTA_DAY.format(new Date(tournamentResults.updated_at))
+      : null;
 
   // Día del evento más reciente (los strings YYYY-MM-DD ordenan cronológicamente).
   const lastEventDay =
-    [lastMatchDay, officialUpdateDay].filter(Boolean).sort().at(-1) ?? null;
+    [lastMatchDay, awardsDay].filter(Boolean).sort().at(-1) ?? null;
 
-  // ¿El general ya estaba contado ANTES de esta jornada? (se cargó un día previo).
-  // Si no, antes valía 0 y su salto se refleja en el Δ de esta jornada.
-  const generalCountedBefore =
-    officialUpdateDay != null &&
-    lastEventDay != null &&
-    officialUpdateDay < lastEventDay;
+  // ¿Los premios ya estaban contados ANTES de esta jornada? (se cargaron un día previo).
+  const awardsCountedBefore =
+    awardsDay != null && lastEventDay != null && awardsDay < lastEventDay;
 
   // Resultados de partidos de jornadas anteriores (día < lastEventDay).
   const resultsAnteriores = new Map<number, MatchResult>();
@@ -206,10 +215,19 @@ export default async function ResumenPage() {
       resultsAnteriores.set(r.match_id, r);
   }
 
+  // Estado del general (bracket) ANTES de esta jornada: bracket oficial recortado
+  // a los partidos finalizados antes de lastEventDay + premios sólo si ya aplicaban.
+  const offAnteriores = bracketResultsAsOf(
+    officialBracket,
+    matchList,
+    new Set(resultsAnteriores.keys()),
+  );
+  const tourAnteriores = awardsCountedBefore ? tournamentResults : null;
+
   // Hay "anterior" si antes de lastEventDay ya había puntos (partidos o general).
   const hasPreviousJornada =
     lastEventDay != null &&
-    (resultsAnteriores.size > 0 || generalCountedBefore);
+    (resultsAnteriores.size > 0 || awardsCountedBefore);
 
   const prevPosById = new Map<string, number>();
   const prevPtsById = new Map<string, number>();
@@ -219,15 +237,14 @@ export default async function ResumenPage() {
         const userPreds =
           predsByUser.get(p.id) ?? new Map<number, MatchPrediction>();
         const t = totalMatchPoints(matchList, userPreds, resultsAnteriores);
-        // El general anterior sólo cuenta si se había cargado en una jornada previa.
-        const bracketTotal = generalCountedBefore
-          ? scoreBracket(
-              bracketsByUser.get(p.id) ?? null,
-              officialBracket,
-              tournamentResults,
-              teamsById,
-            ).total
-          : 0;
+        // El general anterior: bracket anclado a los partidos de antes + premios
+        // sólo si ya se habían entregado en una jornada previa.
+        const bracketTotal = scoreBracket(
+          bracketsByUser.get(p.id) ?? null,
+          offAnteriores,
+          tourAnteriores,
+          teamsById,
+        ).total;
         return {
           id: p.id,
           display_name: p.display_name,
